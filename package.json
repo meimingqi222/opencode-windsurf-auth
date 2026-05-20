@@ -2,6 +2,14 @@
   "name": "opencode-windsurf-auth",
   "version": "0.2.0",
   "description": "OpenCode plugin for Windsurf/Codeium authentication - use Windsurf models in OpenCode",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/rsvedant/opencode-windsurf-auth.git"
+  },
+  "homepage": "https://github.com/rsvedant/opencode-windsurf-auth#readme",
+  "bugs": {
+    "url": "https://github.com/rsvedant/opencode-windsurf-auth/issues"
+  },
   "type": "module",
   "main": "./dist/index.js",
   "types": "./dist/index.d.ts",
