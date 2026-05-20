@@ -10,6 +10,7 @@ import * as crypto from 'crypto';
 import { ChatMessageSource } from './types.js';
 import { resolveModel } from './models.js';
 import { WindsurfCredentials, WindsurfError, WindsurfErrorCode } from './auth.js';
+import { streamCascadeChat } from './cascade-client.js';
 
 // ============================================================================
 // Types
@@ -33,41 +34,14 @@ export interface StreamChatOptions {
 // Protobuf Encoding Helpers
 // ============================================================================
 
-/**
- * Encode a number as a varint (variable-length integer)
- */
-function encodeVarint(value: number | bigint): number[] {
-  const bytes: number[] = [];
-  let v = BigInt(value);
-  while (v > 127n) {
-    bytes.push(Number(v & 0x7fn) | 0x80);
-    v >>= 7n;
-  }
-  bytes.push(Number(v));
-  return bytes;
-}
-
-/**
- * Encode a string field (wire type 2: length-delimited)
- */
-function encodeString(fieldNum: number, str: string): number[] {
-  const strBytes = Buffer.from(str, 'utf8');
-  return [(fieldNum << 3) | 2, ...encodeVarint(strBytes.length), ...strBytes];
-}
-
-/**
- * Encode a nested message field (wire type 2: length-delimited)
- */
-function encodeMessage(fieldNum: number, data: number[]): number[] {
-  return [(fieldNum << 3) | 2, ...encodeVarint(data.length), ...data];
-}
-
-/**
- * Encode a varint field (wire type 0)
- */
-function encodeVarintField(fieldNum: number, value: number | bigint): number[] {
-  return [(fieldNum << 3) | 0, ...encodeVarint(value)];
-}
+// Shared protobuf encoders live in protobuf.ts so prod and tests/live use
+// exactly the same implementation. See historical notes in that file for
+// why single-byte tag encoding broke fields >= 16.
+import {
+  encodeString,
+  encodeMessage,
+  encodeVarintField,
+} from './protobuf.js';
 
 // ============================================================================
 // Request Building
@@ -156,37 +130,76 @@ function encodeChatMessage(content: string, source: number, conversationId: stri
   return bytes;
 }
 
-/**
- * Build the metadata message for the request
- * 
- * Metadata structure:
- * Field 1: ide_name (string)
- * Field 2: extension_version (string)
- * Field 3: api_key (string, required)
- * Field 4: locale (string)
- * Field 7: ide_version (string)
- * Field 12: extension_name (string)
- */
 import { getMetadataFields } from './discovery.js';
 
 /**
- * Build the metadata message for the request
- * Dynamically maps fields using discovered extension.js values
+ * Monotonic per-process request_id (uint64 varint).
+ * Windsurf increments this for every Metadata it emits and the server uses it
+ * to correlate the call with the Cascade session that owns the API key.
  */
-function encodeMetadata(apiKey: string, version: string): number[] {
-  const fields = getMetadataFields();
+let nextRequestId = BigInt(Date.now());
 
-  return [
-    ...encodeString(fields.api_key, apiKey),                    // api_key
-    ...encodeString(fields.ide_name, 'windsurf'),               // ide_name
-    ...encodeString(fields.ide_version, version),               // ide_version
-    ...encodeString(fields.extension_version, version),         // extension_version
-    // Optional fields
-    ...(fields.session_id ? encodeString(fields.session_id, generateUUID()) : []),
-    ...(fields.locale ? encodeString(fields.locale, 'en') : []),
-    // Add extension_name equivalent if needed (often mapped to 12 in older versions or same as ide_name)
-    // For safety, we only encode defined discovered fields
-  ];
+/**
+ * Map process.platform → the OS string Windsurf reports.
+ * Windsurf uses "darwin"/"linux"/"windows" with no architecture suffix.
+ */
+function osString(): string {
+  switch (process.platform) {
+    case 'darwin':
+      return 'darwin';
+    case 'linux':
+      return 'linux';
+    case 'win32':
+      return 'windows';
+    default:
+      return String(process.platform);
+  }
+}
+
+/** Encode a google.protobuf.Timestamp body (seconds + nanos). */
+function encodeTimestampBody(): number[] {
+  const now = Date.now();
+  const seconds = Math.floor(now / 1000);
+  const nanos = (now % 1000) * 1_000_000;
+  const bytes: number[] = [...encodeVarintField(1, seconds)];
+  if (nanos > 0) bytes.push(...encodeVarintField(2, nanos));
+  return bytes;
+}
+
+/**
+ * Build the Metadata message Windsurf expects.
+ *
+ * Mirrors what `MetadataProvider.getMetadata()` ships in the bundled extension
+ * (extension.js): ide_name, ide_version, extension_name, extension_version,
+ * extension_path, api_key, session_id, request_id (BigInt), locale,
+ * device_fingerprint, plan_name, trigger_id, os, ide_type, ls_timestamp.
+ *
+ * Without the request_id / trigger_id / extension_name / os fields the server
+ * returns `failed_precondition: Cascade session error` for every chat model the
+ * user is otherwise allowed to use.
+ */
+function encodeMetadata(apiKey: string, version: string, sessionId: string): number[] {
+  const fields = getMetadataFields();
+  const requestId = nextRequestId++;
+  const triggerId = generateUUID();
+
+  const parts: number[] = [];
+  parts.push(...encodeString(fields.ide_name, 'windsurf'));
+  parts.push(...encodeString(fields.extension_version, version));
+  parts.push(...encodeString(fields.api_key, apiKey));
+  parts.push(...encodeString(fields.locale, 'en'));
+  parts.push(...encodeString(fields.os, osString()));
+  parts.push(...encodeString(fields.ide_version, version));
+  parts.push(...encodeVarintField(fields.request_id, requestId));
+  parts.push(...encodeString(fields.session_id, sessionId));
+  parts.push(...encodeString(fields.extension_name, 'windsurf'));
+  parts.push(...encodeMessage(fields.ls_timestamp, encodeTimestampBody()));
+  parts.push(...encodeString(fields.extension_path, ''));
+  parts.push(...encodeString(fields.device_fingerprint, ''));
+  parts.push(...encodeString(fields.trigger_id, triggerId));
+  parts.push(...encodeString(fields.plan_name, 'Unset'));
+  parts.push(...encodeString(fields.ide_type, 'windsurf'));
+  return parts;
 }
 
 /**
@@ -224,7 +237,8 @@ function buildChatRequest(
   messages: ChatMessage[],
   modelName?: string
 ): Buffer {
-  const metadata = encodeMetadata(apiKey, version);
+  const sessionId = generateUUID();
+  const metadata = encodeMetadata(apiKey, version, sessionId);
   const conversationId = generateUUID();
 
   // Build the request with all messages
@@ -275,27 +289,8 @@ function buildChatRequest(
 // Response Parsing (Protobuf Decoding)
 // ============================================================================
 
-/**
- * Decode a varint from a buffer starting at offset
- * @returns [value, bytesRead]
- */
-function decodeVarint(buffer: Buffer, offset: number): [bigint, number] {
-  let result = 0n;
-  let shift = 0n;
-  let bytesRead = 0;
-
-  while (offset + bytesRead < buffer.length) {
-    const byte = buffer[offset + bytesRead];
-    bytesRead++;
-    result |= BigInt(byte & 0x7f) << shift;
-    if ((byte & 0x80) === 0) {
-      break;
-    }
-    shift += 7n;
-  }
-
-  return [result, bytesRead];
-}
+// decodeVarint is re-exported from the shared protobuf module above.
+import { decodeVarint } from './protobuf.js';
 
 /**
  * Parse a protobuf field from buffer
@@ -490,8 +485,22 @@ export function streamChat(
   credentials: WindsurfCredentials,
   options: StreamChatOptions
 ): Promise<string> {
+  // NOTE: streamChat targets the legacy RawGetChatMessage RPC, which Windsurf
+  // 2.x rejects with "Cascade session error". Kept as an opt-in for users on
+  // older Windsurf builds and as an integration test seam. Production callers
+  // should use streamChatGenerator (Cascade flow). Cognition-era string-UID
+  // models have no proto enum and don't work via this path at all.
   const { csrfToken, port, apiKey, version } = credentials;
   const resolved = resolveModel(options.model);
+  if (resolved.enumValue === undefined) {
+    return Promise.reject(
+      new WindsurfError(
+        `streamChat does not support string-UID models like "${resolved.modelUid}"; ` +
+          `use streamChatGenerator instead.`,
+        WindsurfErrorCode.STREAM_ERROR
+      )
+    );
+  }
   const modelEnum = resolved.enumValue;
   const modelName = resolved.variant ? `${resolved.modelId}:${resolved.variant}` : resolved.modelId;
   const body = buildChatRequest(apiKey, version, modelEnum, options.messages, modelName);
@@ -571,101 +580,85 @@ export function streamChat(
 }
 
 /**
- * Stream chat completion using async generator
- * 
- * Yields text chunks as they arrive, for use with SSE streaming.
- * 
- * @param credentials - Windsurf credentials
- * @param options - Chat options (model and messages)
- * @yields Text chunks as they arrive
+ * Stream a chat completion through Windsurf's Cascade flow.
+ *
+ * The Cascade flow is the only path that works on Windsurf 2.x — RawGetChatMessage
+ * is blocked by a server-side "Cascade session" gate even when all metadata is
+ * populated correctly. See cascade-client.ts for the RPC sequence.
+ *
+ * Multi-message conversations are flattened into a single prompt with role-prefixed
+ * sections. The Cascade trajectory is the source of truth; we don't preserve
+ * conversation state across calls because OpenCode hands us the full history every
+ * turn anyway.
  */
 export async function* streamChatGenerator(
   credentials: WindsurfCredentials,
-  options: Pick<StreamChatOptions, 'model' | 'messages'>
+  options: Pick<StreamChatOptions, 'model' | 'messages'> & { signal?: AbortSignal }
 ): AsyncGenerator<string, void, unknown> {
-  const { csrfToken, port, apiKey, version } = credentials;
   const resolved = resolveModel(options.model);
-  const modelEnum = resolved.enumValue;
-  const modelName = resolved.variant ? `${resolved.modelId}:${resolved.variant}` : resolved.modelId;
-  const body = buildChatRequest(apiKey, version, modelEnum, options.messages, modelName);
+  const prompt = flattenMessagesToPrompt(options.messages);
 
-  const client = http2.connect(`http://localhost:${port}`);
-
-  const chunkQueue: string[] = [];
-  let done = false;
-  let error: Error | null = null;
-  let resolveWait: (() => void) | null = null;
-
-  client.on('error', (err) => {
-    error = new WindsurfError(
-      `Connection failed: ${err.message}`,
-      WindsurfErrorCode.CONNECTION_FAILED,
-      err
-    );
-    done = true;
-    resolveWait?.();
+  // resolved.modelUid is the canonical server identifier — either a legacy
+  // "MODEL_X" enum-name or a Cognition-era string UID (e.g.
+  // "claude-opus-4-7-medium"). Send it directly.
+  yield* streamCascadeChat(credentials, {
+    prompt,
+    modelUid: resolved.modelUid,
+    signal: options.signal,
   });
+}
 
-  const req = client.request({
-    ':method': 'POST',
-    ':path': '/exa.language_server_pb.LanguageServerService/RawGetChatMessage',
-    'content-type': 'application/grpc',
-    'te': 'trailers',
-    'x-codeium-csrf-token': csrfToken,
-  });
-
-  req.on('data', (chunk: Buffer) => {
-    const text = extractTextFromChunk(chunk);
-    if (text) {
-      chunkQueue.push(text);
-      resolveWait?.();
-    }
-  });
-
-  req.on('trailers', (trailers) => {
-    const status = trailers['grpc-status'];
-    if (status !== '0') {
-      const message = trailers['grpc-message'];
-      error = new WindsurfError(
-        `gRPC error ${status}: ${message ? decodeURIComponent(message as string) : 'Unknown error'}`,
-        WindsurfErrorCode.STREAM_ERROR
-      );
-    }
-  });
-
-  req.on('end', () => {
-    done = true;
-    client.close();
-    resolveWait?.();
-  });
-
-  req.on('error', (err) => {
-    error = new WindsurfError(
-      `Request failed: ${err.message}`,
-      WindsurfErrorCode.STREAM_ERROR,
-      err
-    );
-    done = true;
-    client.close();
-    resolveWait?.();
-  });
-
-  req.write(body);
-  req.end();
-
-  // Yield chunks as they arrive
-  while (!done || chunkQueue.length > 0) {
-    if (chunkQueue.length > 0) {
-      yield chunkQueue.shift()!;
-    } else if (!done) {
-      await new Promise<void>((resolve) => {
-        resolveWait = resolve;
-      });
-      resolveWait = null;
+/**
+ * Collapse a multi-turn OpenAI-style message array into a single prompt the
+ * Cascade can accept.
+ *
+ * Each user message is sent as the cascade's input; system messages become an
+ * "Instructions:" preamble, and prior assistant turns are rendered as
+ * "Previous assistant reply:" sections so the model has chat context.
+ */
+function flattenMessagesToPrompt(messages: ChatMessage[]): string {
+  // Find the *index* of the final user message — that becomes the primary
+  // prompt and everything before it (in original order) becomes history.
+  // The previous implementation collapsed historyParts in role-grouped order
+  // rather than chronological order, which silently swapped earlier
+  // user/assistant turns when interleaved.
+  let primaryUserIndex = -1;
+  for (let i = messages.length - 1; i >= 0; i--) {
+    if (messages[i].role === 'user') {
+      primaryUserIndex = i;
+      break;
     }
   }
 
-  if (error) {
-    throw error;
+  const systemParts: string[] = [];
+  const historyParts: string[] = [];
+
+  for (let i = 0; i < messages.length; i++) {
+    if (i === primaryUserIndex) continue;
+    const msg = messages[i];
+    const content = (msg.content ?? '').trim();
+    if (!content) continue;
+    if (msg.role === 'system') {
+      // System messages aren't strictly ordered with user/assistant turns,
+      // but for the common "top-level system" case this collapses cleanly.
+      // If a flow injects a mid-conversation system message, it still ends
+      // up in the preamble — losing positional intent but not content.
+      systemParts.push(content);
+    } else if (msg.role === 'assistant') {
+      historyParts.push(`Previous assistant reply:\n${content}`);
+    } else if (msg.role === 'tool') {
+      historyParts.push(`Previous tool result:\n${content}`);
+    } else if (msg.role === 'user') {
+      historyParts.push(`Previous user message:\n${content}`);
+    }
   }
+
+  const lastUser =
+    primaryUserIndex >= 0 ? (messages[primaryUserIndex].content ?? '').trim() : '';
+
+  const out: string[] = [];
+  if (systemParts.length) out.push(`Instructions:\n${systemParts.join('\n\n')}`);
+  if (historyParts.length) out.push(historyParts.join('\n\n'));
+  if (lastUser) out.push(lastUser);
+  return out.join('\n\n');
 }
