@@ -12,17 +12,54 @@
 import { ModelEnum, type ModelEnumValue } from './types.js';
 
 /**
- * Reverse lookup: enum number → "MODEL_<NAME>" string.
+ * Reverse lookup: enum number → cloud `model_uid` string.
  *
- * The Cascade flow's CascadePlannerConfig.requested_model_uid expects the
- * proto3 enum name (e.g. "MODEL_CLAUDE_4_5_OPUS"), not the integer value, so
- * we derive it from the `ModelEnum` keys we already maintain.
+ * The Cascade flow's `CascadePlannerConfig.requested_model_uid` expects the
+ * proto3 enum name (e.g. "MODEL_CLAUDE_4_5_OPUS"). For most models we can
+ * derive that as `MODEL_${ENUM_KEY}`, but some families on the cloud carry an
+ * extra path component the local enum doesn't (because the enum keys are
+ * named for compactness, while the cloud's UIDs are organized by namespace):
+ *
+ *   - GPT chat / o3 chat   → `MODEL_CHAT_<KEY>`     (verified live: cloud
+ *     advertises `MODEL_CHAT_GPT_4O_2024_08_06`, `MODEL_CHAT_O3`, etc.;
+ *     `MODEL_GPT_*` returns "internal error")
+ *   - Gemini               → `MODEL_GOOGLE_GEMINI_*`
+ *   - Grok                 → `MODEL_XAI_GROK_*`
+ *
+ * The override table below maps an enum-key prefix to the cloud-side UID
+ * prefix. If a prefix isn't listed, we fall back to `MODEL_<KEY>`. To verify
+ * a model's actual cloud UID, call `GetCascadeModelConfigs` and grep.
  */
+const ENUM_PREFIX_OVERRIDES: Array<{ enumPrefix: string; uidPrefix: string }> = [
+  { enumPrefix: 'GPT_4_1_2025_04_14',      uidPrefix: 'MODEL_CHAT_GPT_4_1_2025_04_14' },
+  { enumPrefix: 'GPT_4O_2024_08_06',       uidPrefix: 'MODEL_CHAT_GPT_4O_2024_08_06' },
+  { enumPrefix: 'GPT_5_CODEX',             uidPrefix: 'MODEL_CHAT_GPT_5_CODEX' },
+  { enumPrefix: 'O3_HIGH',                 uidPrefix: 'MODEL_CHAT_O3_HIGH' },
+  { enumPrefix: 'O3',                      uidPrefix: 'MODEL_CHAT_O3' },
+  { enumPrefix: 'GEMINI_3_0_FLASH',        uidPrefix: 'MODEL_GOOGLE_GEMINI_3_0_FLASH' },
+  { enumPrefix: 'GEMINI_2_5_PRO',          uidPrefix: 'MODEL_GOOGLE_GEMINI_2_5_PRO' },
+  { enumPrefix: 'GROK_3_MINI_REASONING',   uidPrefix: 'MODEL_XAI_GROK_3_MINI_REASONING' },
+  { enumPrefix: 'GROK_3',                  uidPrefix: 'MODEL_XAI_GROK_3' },
+];
+
+function enumKeyToCloudUid(key: string): string {
+  // Longest-prefix match so e.g. `O3_HIGH` doesn't accidentally match the
+  // shorter `O3` rule first.
+  const sorted = [...ENUM_PREFIX_OVERRIDES].sort((a, b) => b.enumPrefix.length - a.enumPrefix.length);
+  for (const { enumPrefix, uidPrefix } of sorted) {
+    if (key === enumPrefix) return uidPrefix;
+    if (key.startsWith(enumPrefix + '_')) {
+      return uidPrefix + key.slice(enumPrefix.length);
+    }
+  }
+  return `MODEL_${key}`;
+}
+
 const ENUM_VALUE_TO_NAME: Map<number, string> = (() => {
   const map = new Map<number, string>();
   for (const [key, value] of Object.entries(ModelEnum)) {
     if (typeof value === 'number') {
-      map.set(value, `MODEL_${key}`);
+      map.set(value, enumKeyToCloudUid(key));
     }
   }
   return map;
@@ -81,35 +118,312 @@ type ModelCatalogEntry = {
 // ==========================================================================
 
 const VARIANT_CATALOG: Record<string, ModelCatalogEntry> = {
-  // Claude thinking variants
+  // ============================================================================
+  // Source-of-truth: live `GetCascadeModelConfigs` snapshot (Cognition cloud).
+  // Regenerate with: python3 scripts/regen-models.py < cascade-models.json > /tmp/.
+  // The generated block below contains EVERY model + variant Cognition currently
+  // ships. Adding manual entries here is fine but they'll be overwritten on the
+  // next regen — prefer the upstream catalog as the editing surface.
+  // ============================================================================
+// Auto-generated 2026-05-20 from Cognition GetCascadeModelConfigs.
+// 102 models across 22 families.
+// To regenerate manually:
+//   curl -s -X POST https://server.codeium.com/exa.api_server_pb.ApiServerService/GetCascadeModelConfigs \
+//     -H 'content-type: application/json' -d '{"metadata":{"apiKey":"<KEY>","extensionName":"windsurf","ideName":"windsurf"}}'
+
+  'claude-opus-4.5': {
+    id: 'claude-opus-4.5',
+    defaultUid: 'MODEL_CLAUDE_4_5_OPUS',
+    variants: {
+      'base': { modelUid: 'MODEL_CLAUDE_4_5_OPUS', description: 'Claude Opus 4.5' },
+      'thinking': { modelUid: 'MODEL_CLAUDE_4_5_OPUS_THINKING', description: 'Claude Opus 4.5 Thinking' },
+    },
+    aliases: ['claude-opus-4-5'],
+  },
+  'claude-opus-4.6': {
+    id: 'claude-opus-4.6',
+    defaultUid: 'claude-opus-4-6-thinking',
+    variants: {
+      'thinking': { modelUid: 'claude-opus-4-6-thinking', description: 'Claude Opus 4.6 Thinking' },
+      'base': { modelUid: 'claude-opus-4-6', description: 'Claude Opus 4.6' },
+      '1m': { modelUid: 'claude-opus-4-6-1m', description: 'Claude Opus 4.6 1M' },
+      'thinking-1m': { modelUid: 'claude-opus-4-6-thinking-1m', description: 'Claude Opus 4.6 Thinking 1M' },
+      'fast': { modelUid: 'claude-opus-4-6-fast', description: 'Claude Opus 4.6 Fast' },
+      'thinking-fast': { modelUid: 'claude-opus-4-6-thinking-fast', description: 'Claude Opus 4.6 Thinking Fast' },
+    },
+    aliases: ['claude-opus-4-6'],
+  },
+  'claude-opus-4.7': {
+    id: 'claude-opus-4.7',
+    defaultUid: 'claude-opus-4-7-medium',
+    variants: {
+      'medium': { modelUid: 'claude-opus-4-7-medium', description: 'Claude Opus 4.7 Medium' },
+      'low': { modelUid: 'claude-opus-4-7-low', description: 'Claude Opus 4.7 Low' },
+      'high': { modelUid: 'claude-opus-4-7-high', description: 'Claude Opus 4.7 High' },
+      'xhigh': { modelUid: 'claude-opus-4-7-xhigh', description: 'Claude Opus 4.7 XHigh' },
+      'max': { modelUid: 'claude-opus-4-7-max', description: 'Claude Opus 4.7 Max' },
+      'low-fast': { modelUid: 'claude-opus-4-7-low-fast', description: 'Claude Opus 4.7 Low Fast' },
+      'medium-fast': { modelUid: 'claude-opus-4-7-medium-fast', description: 'Claude Opus 4.7 Medium Fast' },
+      'high-fast': { modelUid: 'claude-opus-4-7-high-fast', description: 'Claude Opus 4.7 High Fast' },
+      'xhigh-fast': { modelUid: 'claude-opus-4-7-xhigh-fast', description: 'Claude Opus 4.7 XHigh Fast' },
+      'max-fast': { modelUid: 'claude-opus-4-7-max-fast', description: 'Claude Opus 4.7 Max Fast' },
+    },
+    aliases: ['claude-opus-4-7'],
+  },
+  'claude-sonnet-4.5': {
+    id: 'claude-sonnet-4.5',
+    defaultUid: 'MODEL_PRIVATE_2',
+    variants: {
+      '2': { modelUid: 'MODEL_PRIVATE_2', description: 'Claude Sonnet 4.5' },
+      '3': { modelUid: 'MODEL_PRIVATE_3', description: 'Claude Sonnet 4.5 Thinking' },
+    },
+    aliases: ['claude-sonnet-4-5'],
+  },
+  'claude-sonnet-4.6': {
+    id: 'claude-sonnet-4.6',
+    defaultUid: 'claude-sonnet-4-6-thinking',
+    variants: {
+      'thinking': { modelUid: 'claude-sonnet-4-6-thinking', description: 'Claude Sonnet 4.6 Thinking' },
+      'base': { modelUid: 'claude-sonnet-4-6', description: 'Claude Sonnet 4.6' },
+      '1m': { modelUid: 'claude-sonnet-4-6-1m', description: 'Claude Sonnet 4.6 1M' },
+      'thinking-1m': { modelUid: 'claude-sonnet-4-6-thinking-1m', description: 'Claude Sonnet 4.6 Thinking 1M' },
+    },
+    aliases: ['claude-sonnet-4-6'],
+  },
+  'gemini-3.0-flash': {
+    id: 'gemini-3.0-flash',
+    defaultUid: 'MODEL_GOOGLE_GEMINI_3_0_FLASH_MINIMAL',
+    variants: {
+      'minimal': { modelUid: 'MODEL_GOOGLE_GEMINI_3_0_FLASH_MINIMAL', description: 'Gemini 3 Flash Minimal' },
+      'low': { modelUid: 'MODEL_GOOGLE_GEMINI_3_0_FLASH_LOW', description: 'Gemini 3 Flash Low' },
+      'medium': { modelUid: 'MODEL_GOOGLE_GEMINI_3_0_FLASH_MEDIUM', description: 'Gemini 3 Flash Medium' },
+      'high': { modelUid: 'MODEL_GOOGLE_GEMINI_3_0_FLASH_HIGH', description: 'Gemini 3 Flash High' },
+    },
+    aliases: ['gemini-3-0-flash'],
+  },
+  'gemini-3.1-pro': {
+    id: 'gemini-3.1-pro',
+    defaultUid: 'gemini-3-1-pro-low',
+    variants: {
+      'low': { modelUid: 'gemini-3-1-pro-low', description: 'Gemini 3.1 Pro Low Thinking' },
+      'high': { modelUid: 'gemini-3-1-pro-high', description: 'Gemini 3.1 Pro High Thinking' },
+    },
+    aliases: ['gemini-3-1-pro'],
+  },
+  'gemini-3.5-flash': {
+    id: 'gemini-3.5-flash',
+    defaultUid: 'gemini-3-5-flash-medium',
+    variants: {
+      'medium': { modelUid: 'gemini-3-5-flash-medium', description: 'Gemini 3.5 Flash Medium' },
+      'minimal': { modelUid: 'gemini-3-5-flash-minimal', description: 'Gemini 3.5 Flash Minimal' },
+      'low': { modelUid: 'gemini-3-5-flash-low', description: 'Gemini 3.5 Flash Low' },
+      'high': { modelUid: 'gemini-3-5-flash-high', description: 'Gemini 3.5 Flash High' },
+    },
+    aliases: ['gemini-3-5-flash'],
+  },
+  'glm-5.1': {
+    id: 'glm-5.1',
+    defaultUid: 'glm-5-1',
+    aliases: ['glm-5-1'],
+  },
+  'gpt-5.1': {
+    id: 'gpt-5.1',
+    defaultUid: 'MODEL_PRIVATE_12',
+    variants: {
+      '12': { modelUid: 'MODEL_PRIVATE_12', description: 'GPT-5.1 No Thinking' },
+      '13': { modelUid: 'MODEL_PRIVATE_13', description: 'GPT-5.1 Low Thinking' },
+      '14': { modelUid: 'MODEL_PRIVATE_14', description: 'GPT-5.1 Medium Thinking' },
+      '15': { modelUid: 'MODEL_PRIVATE_15', description: 'GPT-5.1 High Thinking' },
+      '20': { modelUid: 'MODEL_PRIVATE_20', description: 'GPT-5.1 No Thinking Fast' },
+      '21': { modelUid: 'MODEL_PRIVATE_21', description: 'GPT-5.1 Low Thinking Fast' },
+      '22': { modelUid: 'MODEL_PRIVATE_22', description: 'GPT-5.1 Medium Thinking Fast' },
+      '23': { modelUid: 'MODEL_PRIVATE_23', description: 'GPT-5.1 High Thinking Fast' },
+    },
+    aliases: ['gpt-5-1'],
+  },
+  'gpt-5.1-codex': {
+    id: 'gpt-5.1-codex',
+    defaultUid: 'MODEL_GPT_5_1_CODEX_LOW',
+    aliases: ['gpt-5-1-codex'],
+  },
+  'gpt-5.1-codex-max': {
+    id: 'gpt-5.1-codex-max',
+    defaultUid: 'MODEL_GPT_5_1_CODEX_MAX_LOW',
+    variants: {
+      'low': { modelUid: 'MODEL_GPT_5_1_CODEX_MAX_LOW', description: 'GPT-5.1-Codex Max Low' },
+      'medium': { modelUid: 'MODEL_GPT_5_1_CODEX_MAX_MEDIUM', description: 'GPT-5.1-Codex Max Medium' },
+      'high': { modelUid: 'MODEL_GPT_5_1_CODEX_MAX_HIGH', description: 'GPT-5.1-Codex Max High' },
+    },
+    aliases: ['gpt-5-1-codex-max'],
+  },
+  'gpt-5.1-codex-mini': {
+    id: 'gpt-5.1-codex-mini',
+    defaultUid: 'MODEL_GPT_5_1_CODEX_MINI_LOW',
+    aliases: ['gpt-5-1-codex-mini'],
+  },
+  'gpt-5.2': {
+    id: 'gpt-5.2',
+    defaultUid: 'MODEL_GPT_5_2_LOW',
+    variants: {
+      'low': { modelUid: 'MODEL_GPT_5_2_LOW', description: 'GPT-5.2 Low Thinking' },
+      'medium': { modelUid: 'MODEL_GPT_5_2_MEDIUM', description: 'GPT-5.2 Medium Thinking' },
+      'low-priority': { modelUid: 'MODEL_GPT_5_2_LOW_PRIORITY', description: 'GPT-5.2 Low Thinking Fast' },
+      'medium-priority': { modelUid: 'MODEL_GPT_5_2_MEDIUM_PRIORITY', description: 'GPT-5.2 Medium Thinking Fast' },
+      'none': { modelUid: 'MODEL_GPT_5_2_NONE', description: 'GPT-5.2 No Thinking' },
+      'high': { modelUid: 'MODEL_GPT_5_2_HIGH', description: 'GPT-5.2 High Thinking' },
+      'xhigh': { modelUid: 'MODEL_GPT_5_2_XHIGH', description: 'GPT-5.2 XHigh Thinking' },
+      'none-priority': { modelUid: 'MODEL_GPT_5_2_NONE_PRIORITY', description: 'GPT-5.2 No Thinking Fast' },
+      'high-priority': { modelUid: 'MODEL_GPT_5_2_HIGH_PRIORITY', description: 'GPT-5.2 High Thinking Fast' },
+      'xhigh-priority': { modelUid: 'MODEL_GPT_5_2_XHIGH_PRIORITY', description: 'GPT-5.2 XHigh Thinking Fast' },
+    },
+    aliases: ['gpt-5-2'],
+  },
+  'gpt-5.2-codex': {
+    id: 'gpt-5.2-codex',
+    defaultUid: 'MODEL_GPT_5_2_CODEX_LOW',
+    variants: {
+      'low': { modelUid: 'MODEL_GPT_5_2_CODEX_LOW', description: 'GPT-5.2-Codex Low' },
+      'medium': { modelUid: 'MODEL_GPT_5_2_CODEX_MEDIUM', description: 'GPT-5.2-Codex Medium' },
+      'high': { modelUid: 'MODEL_GPT_5_2_CODEX_HIGH', description: 'GPT-5.2-Codex High' },
+      'xhigh': { modelUid: 'MODEL_GPT_5_2_CODEX_XHIGH', description: 'GPT-5.2-Codex XHigh' },
+      'low-priority': { modelUid: 'MODEL_GPT_5_2_CODEX_LOW_PRIORITY', description: 'GPT-5.2-Codex Low Fast' },
+      'medium-priority': { modelUid: 'MODEL_GPT_5_2_CODEX_MEDIUM_PRIORITY', description: 'GPT-5.2-Codex Medium Fast' },
+      'high-priority': { modelUid: 'MODEL_GPT_5_2_CODEX_HIGH_PRIORITY', description: 'GPT-5.2-Codex High Fast' },
+      'xhigh-priority': { modelUid: 'MODEL_GPT_5_2_CODEX_XHIGH_PRIORITY', description: 'GPT-5.2-Codex XHigh Fast' },
+    },
+    aliases: ['gpt-5-2-codex'],
+  },
+  'gpt-5.3-codex': {
+    id: 'gpt-5.3-codex',
+    defaultUid: 'gpt-5-3-codex-medium',
+    variants: {
+      'low': { modelUid: 'gpt-5-3-codex-low', description: 'GPT-5.3-Codex Low' },
+      'medium': { modelUid: 'gpt-5-3-codex-medium', description: 'GPT-5.3-Codex Medium' },
+      'high': { modelUid: 'gpt-5-3-codex-high', description: 'GPT-5.3-Codex High' },
+      'xhigh': { modelUid: 'gpt-5-3-codex-xhigh', description: 'GPT-5.3-Codex X-High' },
+      'low-priority': { modelUid: 'gpt-5-3-codex-low-priority', description: 'GPT-5.3-Codex Low Fast' },
+      'medium-priority': { modelUid: 'gpt-5-3-codex-medium-priority', description: 'GPT-5.3-Codex Medium Fast' },
+      'high-priority': { modelUid: 'gpt-5-3-codex-high-priority', description: 'GPT-5.3-Codex High Fast' },
+      'xhigh-priority': { modelUid: 'gpt-5-3-codex-xhigh-priority', description: 'GPT-5.3-Codex XHigh Fast' },
+    },
+    aliases: ['gpt-5-3-codex'],
+  },
+  'gpt-5.4': {
+    id: 'gpt-5.4',
+    defaultUid: 'gpt-5-4-none',
+    variants: {
+      'none': { modelUid: 'gpt-5-4-none', description: 'GPT-5.4 No Thinking' },
+      'low': { modelUid: 'gpt-5-4-low', description: 'GPT-5.4 Low Thinking' },
+      'medium': { modelUid: 'gpt-5-4-medium', description: 'GPT-5.4 Medium Thinking' },
+      'high': { modelUid: 'gpt-5-4-high', description: 'GPT-5.4 High Thinking' },
+      'xhigh': { modelUid: 'gpt-5-4-xhigh', description: 'GPT-5.4 XHigh Thinking' },
+      'none-priority': { modelUid: 'gpt-5-4-none-priority', description: 'GPT-5.4 No Thinking Fast' },
+      'low-priority': { modelUid: 'gpt-5-4-low-priority', description: 'GPT-5.4 Low Thinking Fast' },
+      'medium-priority': { modelUid: 'gpt-5-4-medium-priority', description: 'GPT-5.4 Medium Thinking Fast' },
+      'high-priority': { modelUid: 'gpt-5-4-high-priority', description: 'GPT-5.4 High Thinking Fast' },
+      'xhigh-priority': { modelUid: 'gpt-5-4-xhigh-priority', description: 'GPT-5.4 XHigh Thinking Fast' },
+    },
+    aliases: ['gpt-5-4'],
+  },
+  'gpt-5.4-mini': {
+    id: 'gpt-5.4-mini',
+    defaultUid: 'gpt-5-4-mini-low',
+    variants: {
+      'low': { modelUid: 'gpt-5-4-mini-low', description: 'GPT-5.4 Mini Low Thinking' },
+      'medium': { modelUid: 'gpt-5-4-mini-medium', description: 'GPT-5.4 Mini Medium Thinking' },
+      'high': { modelUid: 'gpt-5-4-mini-high', description: 'GPT-5.4 Mini High Thinking' },
+      'xhigh': { modelUid: 'gpt-5-4-mini-xhigh', description: 'GPT-5.4 Mini XHigh Thinking' },
+    },
+    aliases: ['gpt-5-4-mini'],
+  },
+  'gpt-5.5': {
+    id: 'gpt-5.5',
+    defaultUid: 'gpt-5-5-low',
+    variants: {
+      'low': { modelUid: 'gpt-5-5-low', description: 'GPT-5.5 Low Thinking' },
+      'none': { modelUid: 'gpt-5-5-none', description: 'GPT-5.5 No Thinking' },
+      'medium': { modelUid: 'gpt-5-5-medium', description: 'GPT-5.5 Medium Thinking' },
+      'high': { modelUid: 'gpt-5-5-high', description: 'GPT-5.5 High Thinking' },
+      'xhigh': { modelUid: 'gpt-5-5-xhigh', description: 'GPT-5.5 XHigh Thinking' },
+      'none-priority': { modelUid: 'gpt-5-5-none-priority', description: 'GPT-5.5 No Thinking Fast' },
+      'low-priority': { modelUid: 'gpt-5-5-low-priority', description: 'GPT-5.5 Low Thinking Fast' },
+      'medium-priority': { modelUid: 'gpt-5-5-medium-priority', description: 'GPT-5.5 Medium Thinking Fast' },
+      'high-priority': { modelUid: 'gpt-5-5-high-priority', description: 'GPT-5.5 High Thinking Fast' },
+      'xhigh-priority': { modelUid: 'gpt-5-5-xhigh-priority', description: 'GPT-5.5 XHigh Thinking Fast' },
+    },
+    aliases: ['gpt-5-5'],
+  },
+  'kimi-k2.5': {
+    id: 'kimi-k2.5',
+    defaultUid: 'kimi-k2-5',
+    aliases: ['kimi-k2-5'],
+  },
+  'kimi-k2.6': {
+    id: 'kimi-k2.6',
+    defaultUid: 'kimi-k2-6',
+    aliases: ['kimi-k2-6'],
+  },
+  'o3': {
+    id: 'o3',
+    defaultUid: 'MODEL_CHAT_O3',
+    variants: {
+      'base': { modelUid: 'MODEL_CHAT_O3', description: 'o3' },
+      'high': { modelUid: 'MODEL_CHAT_O3_HIGH', description: 'o3 High Reasoning' },
+    },
+  },
+
+  // ============================================================================
+  // Family-less models. Cognition's catalog returns these with no
+  // `modelFamilyUid`, so the regen script can't group them. Registered here
+  // so user-facing names `swe-1.6`, `deepseek-v4`, etc. resolve correctly.
+  // ============================================================================
+
+  'swe-1.6': {
+    id: 'swe-1.6',
+    defaultUid: 'swe-1-6',
+    variants: {
+      'base': { modelUid: 'swe-1-6', description: 'SWE-1.6' },
+      'fast': { modelUid: 'swe-1-6-fast', description: 'SWE-1.6 Fast' },
+    },
+    aliases: ['swe-1-6'],
+  },
+  'deepseek-v4': {
+    id: 'deepseek-v4',
+    defaultUid: 'deepseek-v4',
+  },
+  'minimax-m2.5': {
+    id: 'minimax-m2.5',
+    defaultUid: 'minimax-m2-5',
+    aliases: ['minimax-m2-5'],
+  },
+  'swe-1.5': {
+    id: 'swe-1.5',
+    defaultUid: 'MODEL_SWE_1_5_SLOW',
+    variants: {
+      'base': { modelUid: 'MODEL_SWE_1_5_SLOW', description: 'SWE-1.5' },
+      'fast': { modelUid: 'MODEL_SWE_1_5', description: 'SWE-1.5 Fast' },
+    },
+    aliases: ['swe-1-5'],
+  },
+
+  // ============================================================================
+  // Legacy variant-bearing entries (pre-Cognition naming). These models are no
+  // longer in `GetCascadeModelConfigs`, but plenty of opencode configs still
+  // address them by the old human-readable family name + colon-variant. We
+  // keep them around so `windsurf/claude-3.7-sonnet:thinking` and friends still
+  // resolve via the legacy `MODEL_*` proto-enum names that the cloud still
+  // accepts. The bare family alias (no `:variant`) is also covered by the
+  // bottom MODEL_NAME_TO_ENUM fallback table; these entries add the
+  // `:thinking` / `:lite` / `:minimal` / etc. variant routing on top.
+  // ============================================================================
+
   'claude-3.7-sonnet': {
     id: 'claude-3.7-sonnet',
     defaultEnum: ModelEnum.CLAUDE_3_7_SONNET_20250219,
     variants: {
       thinking: { enumValue: ModelEnum.CLAUDE_3_7_SONNET_20250219_THINKING, description: 'Thinking mode' },
     },
-  },
-  'claude-4.5-sonnet': {
-    id: 'claude-4.5-sonnet',
-    defaultEnum: ModelEnum.CLAUDE_4_5_SONNET,
-    variants: {
-      thinking: { enumValue: ModelEnum.CLAUDE_4_5_SONNET_THINKING, description: 'Thinking mode' },
-    },
-  },
-  'claude-4.5-opus': {
-    id: 'claude-4.5-opus',
-    defaultEnum: ModelEnum.CLAUDE_4_5_OPUS,
-    variants: {
-      thinking: { enumValue: ModelEnum.CLAUDE_4_5_OPUS_THINKING, description: 'Thinking mode' },
-    },
-  },
-  'claude-4.1-opus': {
-    id: 'claude-4.1-opus',
-    defaultEnum: ModelEnum.CLAUDE_4_1_OPUS,
-    variants: {
-      thinking: { enumValue: ModelEnum.CLAUDE_4_1_OPUS_THINKING, description: 'Thinking mode' },
-    },
-    aliases: ['claude-4-1-opus'],
+    aliases: ['claude-3-7-sonnet'],
   },
   'claude-4-opus': {
     id: 'claude-4-opus',
@@ -125,8 +439,30 @@ const VARIANT_CATALOG: Record<string, ModelCatalogEntry> = {
       thinking: { enumValue: ModelEnum.CLAUDE_4_SONNET_THINKING, description: 'Thinking mode' },
     },
   },
-
-  // Google Gemini 2.5 / 3.0
+  'claude-4.1-opus': {
+    id: 'claude-4.1-opus',
+    defaultEnum: ModelEnum.CLAUDE_4_1_OPUS,
+    variants: {
+      thinking: { enumValue: ModelEnum.CLAUDE_4_1_OPUS_THINKING, description: 'Thinking mode' },
+    },
+    aliases: ['claude-4-1-opus'],
+  },
+  'claude-4.5-sonnet': {
+    id: 'claude-4.5-sonnet',
+    defaultEnum: ModelEnum.CLAUDE_4_5_SONNET,
+    variants: {
+      thinking: { enumValue: ModelEnum.CLAUDE_4_5_SONNET_THINKING, description: 'Thinking mode' },
+    },
+    aliases: ['claude-4-5-sonnet'],
+  },
+  'claude-4.5-opus': {
+    id: 'claude-4.5-opus',
+    defaultEnum: ModelEnum.CLAUDE_4_5_OPUS,
+    variants: {
+      thinking: { enumValue: ModelEnum.CLAUDE_4_5_OPUS_THINKING, description: 'Thinking mode' },
+    },
+    aliases: ['claude-4-5-opus'],
+  },
   'gemini-2.5-flash': {
     id: 'gemini-2.5-flash',
     defaultEnum: ModelEnum.GEMINI_2_5_FLASH,
@@ -136,7 +472,6 @@ const VARIANT_CATALOG: Record<string, ModelCatalogEntry> = {
     },
     aliases: ['gemini-2-5-flash'],
   },
-  // Google Gemini 3.0 Pro
   'gemini-3.0-pro': {
     id: 'gemini-3.0-pro',
     defaultEnum: ModelEnum.GEMINI_3_0_PRO_MEDIUM,
@@ -148,302 +483,32 @@ const VARIANT_CATALOG: Record<string, ModelCatalogEntry> = {
     },
     aliases: ['gemini-3-0-pro'],
   },
-  // Google Gemini 3.0 Flash
-  'gemini-3.0-flash': {
-    id: 'gemini-3.0-flash',
-    defaultEnum: ModelEnum.GEMINI_3_0_FLASH_MEDIUM,
-    variants: {
-      minimal: { enumValue: ModelEnum.GEMINI_3_0_FLASH_MINIMAL, description: 'Cheapest, lowest latency' },
-      low: { enumValue: ModelEnum.GEMINI_3_0_FLASH_LOW, description: 'Low thinking budget' },
-      medium: { enumValue: ModelEnum.GEMINI_3_0_FLASH_MEDIUM, description: 'Balanced (default)' },
-      high: { enumValue: ModelEnum.GEMINI_3_0_FLASH_HIGH, description: 'Higher reasoning budget' },
-    },
-    aliases: ['gemini-3-0-flash'],
-  },
-  // GPT 5.2
-  'gpt-5.2': {
-    id: 'gpt-5.2',
-    defaultEnum: ModelEnum.GPT_5_2_MEDIUM,
-    variants: {
-      low: { enumValue: ModelEnum.GPT_5_2_LOW, description: 'Lower cost' },
-      medium: { enumValue: ModelEnum.GPT_5_2_MEDIUM, description: 'Balanced (default)' },
-      high: { enumValue: ModelEnum.GPT_5_2_HIGH, description: 'Higher capability' },
-      xhigh: { enumValue: ModelEnum.GPT_5_2_XHIGH, description: 'Maximum capability' },
-      priority: { enumValue: ModelEnum.GPT_5_2_MEDIUM_PRIORITY, description: 'Priority routing (medium)' },
-      'low-priority': { enumValue: ModelEnum.GPT_5_2_LOW_PRIORITY, description: 'Priority routing (low)' },
-      'high-priority': { enumValue: ModelEnum.GPT_5_2_HIGH_PRIORITY, description: 'Priority routing (high)' },
-      'xhigh-priority': { enumValue: ModelEnum.GPT_5_2_XHIGH_PRIORITY, description: 'Priority routing (xhigh)' },
-    },
-    aliases: ['gpt-5-2'],
-  },
-  // GPT 5.2 Codex
-  'gpt-5.2-codex': {
-    id: 'gpt-5.2-codex',
-    defaultEnum: ModelEnum.GPT_5_2_CODEX_MEDIUM,
-    variants: {
-      low: { enumValue: ModelEnum.GPT_5_2_CODEX_LOW, description: 'Lower cost' },
-      medium: { enumValue: ModelEnum.GPT_5_2_CODEX_MEDIUM, description: 'Balanced (default)' },
-      high: { enumValue: ModelEnum.GPT_5_2_CODEX_HIGH, description: 'Higher capability' },
-      xhigh: { enumValue: ModelEnum.GPT_5_2_CODEX_XHIGH, description: 'Maximum capability' },
-      'low-priority': { enumValue: ModelEnum.GPT_5_2_CODEX_LOW_PRIORITY, description: 'Priority routing (low)' },
-      'medium-priority': { enumValue: ModelEnum.GPT_5_2_CODEX_MEDIUM_PRIORITY, description: 'Priority routing (medium)' },
-      'high-priority': { enumValue: ModelEnum.GPT_5_2_CODEX_HIGH_PRIORITY, description: 'Priority routing (high)' },
-      'xhigh-priority': { enumValue: ModelEnum.GPT_5_2_CODEX_XHIGH_PRIORITY, description: 'Priority routing (xhigh)' },
-    },
-    aliases: ['gpt-5-2-codex'],
-  },
-  // SWE-1.6 — both proto enum and string-uid metadata, but the string UID is
-  // what we actually send (uidForEntry prefers defaultUid). The enumValue is
-  // kept for callers of `modelNameToEnum()` who still want the integer; the
-  // server itself only sees `swe-1-6` / `swe-1-6-fast`.
-  'swe-1.6': {
-    id: 'swe-1.6',
-    defaultEnum: ModelEnum.SWE_1_6,
-    defaultUid: 'swe-1-6',
-    variants: {
-      fast: { enumValue: ModelEnum.SWE_1_6_FAST, modelUid: 'swe-1-6-fast', description: 'Faster variant' },
-    },
-    aliases: ['swe-1-6'],
-  },
-
-  // ============================================================================
-  // String-UID models (Cognition-era).
-  //
-  // These have NO proto enum entry — `model_or_alias.model = 0` in the server
-  // response. The identifier IS the `model_uid` string. To enumerate the live
-  // set on any given account, call GetUserStatus and walk
-  //   user_status.cascade_model_config_data.client_model_configs[]
-  // See docs/CASCADE_PROTOCOL.md §3 for the protocol details.
-  // ============================================================================
-
-  // Claude Opus 4.7 — 5 reasoning intensities × {default, -fast (priority)}
-  'claude-opus-4.7': {
-    id: 'claude-opus-4.7',
-    defaultUid: 'claude-opus-4-7-medium',
-    variants: {
-      low: { modelUid: 'claude-opus-4-7-low', description: 'Lowest reasoning budget' },
-      medium: { modelUid: 'claude-opus-4-7-medium', description: 'Balanced (default)' },
-      high: { modelUid: 'claude-opus-4-7-high', description: 'Higher reasoning' },
-      xhigh: { modelUid: 'claude-opus-4-7-xhigh', description: 'Even higher reasoning' },
-      max: { modelUid: 'claude-opus-4-7-max', description: 'Maximum reasoning' },
-      'low-fast': { modelUid: 'claude-opus-4-7-low-fast', description: 'Priority/fast tier' },
-      'medium-fast': { modelUid: 'claude-opus-4-7-medium-fast', description: 'Priority/fast tier' },
-      'high-fast': { modelUid: 'claude-opus-4-7-high-fast', description: 'Priority/fast tier' },
-      'xhigh-fast': { modelUid: 'claude-opus-4-7-xhigh-fast', description: 'Priority/fast tier' },
-      'max-fast': { modelUid: 'claude-opus-4-7-max-fast', description: 'Priority/fast tier' },
-    },
-    aliases: ['claude-opus-4-7', 'opus-4.7', 'opus-4-7'],
-  },
-
-  // Claude Opus 4.6 — base + thinking + 1M context + fast variants
-  'claude-opus-4.6': {
-    id: 'claude-opus-4.6',
-    defaultUid: 'claude-opus-4-6',
-    variants: {
-      thinking: { modelUid: 'claude-opus-4-6-thinking', description: 'Extended thinking' },
-      '1m': { modelUid: 'claude-opus-4-6-1m', description: '1M context window' },
-      'thinking-1m': { modelUid: 'claude-opus-4-6-thinking-1m', description: 'Thinking + 1M context' },
-      fast: { modelUid: 'claude-opus-4-6-fast', description: 'Priority/fast tier' },
-      'thinking-fast': { modelUid: 'claude-opus-4-6-thinking-fast', description: 'Thinking, priority tier' },
-    },
-    aliases: ['claude-opus-4-6'],
-  },
-
-  // Claude Sonnet 4.6
-  'claude-sonnet-4.6': {
-    id: 'claude-sonnet-4.6',
-    defaultUid: 'claude-sonnet-4-6',
-    variants: {
-      thinking: { modelUid: 'claude-sonnet-4-6-thinking', description: 'Extended thinking' },
-      '1m': { modelUid: 'claude-sonnet-4-6-1m', description: '1M context window' },
-      'thinking-1m': { modelUid: 'claude-sonnet-4-6-thinking-1m', description: 'Thinking + 1M context' },
-    },
-    aliases: ['claude-sonnet-4-6', 'sonnet-4.6'],
-  },
-
-  // Gemini 3.5 Flash — 4 reasoning budgets
-  'gemini-3.5-flash': {
-    id: 'gemini-3.5-flash',
-    defaultUid: 'gemini-3-5-flash-medium',
-    variants: {
-      minimal: { modelUid: 'gemini-3-5-flash-minimal', description: 'Cheapest, lowest reasoning' },
-      low: { modelUid: 'gemini-3-5-flash-low', description: 'Low reasoning' },
-      medium: { modelUid: 'gemini-3-5-flash-medium', description: 'Balanced (default)' },
-      high: { modelUid: 'gemini-3-5-flash-high', description: 'High reasoning' },
-    },
-    aliases: ['gemini-3-5-flash'],
-  },
-
-  // Gemini 3.1 Pro
-  'gemini-3.1-pro': {
-    id: 'gemini-3.1-pro',
-    defaultUid: 'gemini-3-1-pro-low',
-    variants: {
-      low: { modelUid: 'gemini-3-1-pro-low', description: 'Lower reasoning (default)' },
-      high: { modelUid: 'gemini-3-1-pro-high', description: 'Higher reasoning' },
-    },
-    aliases: ['gemini-3-1-pro'],
-  },
-
-  // GPT-5.4 — 5 reasoning intensities × {default, -priority}
-  'gpt-5.4': {
-    id: 'gpt-5.4',
-    defaultUid: 'gpt-5-4-medium',
-    variants: {
-      none: { modelUid: 'gpt-5-4-none', description: 'No reasoning' },
-      low: { modelUid: 'gpt-5-4-low', description: 'Low reasoning' },
-      medium: { modelUid: 'gpt-5-4-medium', description: 'Balanced (default)' },
-      high: { modelUid: 'gpt-5-4-high', description: 'High reasoning' },
-      xhigh: { modelUid: 'gpt-5-4-xhigh', description: 'Maximum reasoning' },
-      'none-priority': { modelUid: 'gpt-5-4-none-priority', description: 'Priority routing' },
-      'low-priority': { modelUid: 'gpt-5-4-low-priority', description: 'Priority routing' },
-      'medium-priority': { modelUid: 'gpt-5-4-medium-priority', description: 'Priority routing' },
-      'high-priority': { modelUid: 'gpt-5-4-high-priority', description: 'Priority routing' },
-      'xhigh-priority': { modelUid: 'gpt-5-4-xhigh-priority', description: 'Priority routing' },
-    },
-    aliases: ['gpt-5-4'],
-  },
-
-  // GPT-5.4 Mini
-  'gpt-5.4-mini': {
-    id: 'gpt-5.4-mini',
-    defaultUid: 'gpt-5-4-mini-medium',
-    variants: {
-      low: { modelUid: 'gpt-5-4-mini-low', description: 'Low reasoning' },
-      medium: { modelUid: 'gpt-5-4-mini-medium', description: 'Balanced (default)' },
-      high: { modelUid: 'gpt-5-4-mini-high', description: 'High reasoning' },
-      xhigh: { modelUid: 'gpt-5-4-mini-xhigh', description: 'Maximum reasoning' },
-    },
-    aliases: ['gpt-5-4-mini'],
-  },
-
-  // GPT-5.5
-  'gpt-5.5': {
-    id: 'gpt-5.5',
-    defaultUid: 'gpt-5-5-medium',
-    variants: {
-      none: { modelUid: 'gpt-5-5-none', description: 'No reasoning' },
-      low: { modelUid: 'gpt-5-5-low', description: 'Low reasoning' },
-      medium: { modelUid: 'gpt-5-5-medium', description: 'Balanced (default)' },
-      high: { modelUid: 'gpt-5-5-high', description: 'High reasoning' },
-      xhigh: { modelUid: 'gpt-5-5-xhigh', description: 'Maximum reasoning' },
-      'none-priority': { modelUid: 'gpt-5-5-none-priority', description: 'Priority routing' },
-      'low-priority': { modelUid: 'gpt-5-5-low-priority', description: 'Priority routing' },
-      'medium-priority': { modelUid: 'gpt-5-5-medium-priority', description: 'Priority routing' },
-      'high-priority': { modelUid: 'gpt-5-5-high-priority', description: 'Priority routing' },
-      'xhigh-priority': { modelUid: 'gpt-5-5-xhigh-priority', description: 'Priority routing' },
-    },
-    aliases: ['gpt-5-5'],
-  },
-
-  // GPT-5.3 Codex
-  'gpt-5.3-codex': {
-    id: 'gpt-5.3-codex',
-    defaultUid: 'gpt-5-3-codex-medium',
-    variants: {
-      low: { modelUid: 'gpt-5-3-codex-low', description: 'Low reasoning' },
-      medium: { modelUid: 'gpt-5-3-codex-medium', description: 'Balanced (default)' },
-      high: { modelUid: 'gpt-5-3-codex-high', description: 'High reasoning' },
-      xhigh: { modelUid: 'gpt-5-3-codex-xhigh', description: 'Maximum reasoning' },
-      'low-priority': { modelUid: 'gpt-5-3-codex-low-priority', description: 'Priority routing' },
-      'medium-priority': { modelUid: 'gpt-5-3-codex-medium-priority', description: 'Priority routing' },
-      'high-priority': { modelUid: 'gpt-5-3-codex-high-priority', description: 'Priority routing' },
-      'xhigh-priority': { modelUid: 'gpt-5-3-codex-xhigh-priority', description: 'Priority routing' },
-    },
-    aliases: ['gpt-5-3-codex'],
-  },
-
-  // Single-variant new models
-  'kimi-k2.5': {
-    id: 'kimi-k2.5',
-    defaultUid: 'kimi-k2-5',
-    aliases: ['kimi-k2-5'],
-  },
-  'kimi-k2.6': {
-    id: 'kimi-k2.6',
-    defaultUid: 'kimi-k2-6',
-    aliases: ['kimi-k2-6'],
-  },
-  'deepseek-v4': {
-    id: 'deepseek-v4',
-    defaultUid: 'deepseek-v4',
-  },
-  'glm-5.1': {
-    id: 'glm-5.1',
-    defaultUid: 'glm-5-1',
-    aliases: ['glm-5-1'],
-  },
-  'minimax-m2.5': {
-    id: 'minimax-m2.5',
-    defaultUid: 'minimax-m2-5',
-    aliases: ['minimax-m2-5'],
-  },
-  // GPT 5
   'gpt-5': {
     id: 'gpt-5',
     defaultEnum: ModelEnum.GPT_5,
     variants: {
-      low: { enumValue: ModelEnum.GPT_5_LOW, description: 'Lower cost' },
-      high: { enumValue: ModelEnum.GPT_5_HIGH, description: 'Higher capability' },
-      nano: { enumValue: ModelEnum.GPT_5_NANO, description: 'Small footprint' },
-    },
-  },
-  // GPT 5.1 Codex families
-  'gpt-5.1-codex-mini': {
-    id: 'gpt-5.1-codex-mini',
-    defaultEnum: ModelEnum.GPT_5_1_CODEX_MINI_MEDIUM,
-    variants: {
-      low: { enumValue: ModelEnum.GPT_5_1_CODEX_MINI_LOW },
-      medium: { enumValue: ModelEnum.GPT_5_1_CODEX_MINI_MEDIUM },
-      high: { enumValue: ModelEnum.GPT_5_1_CODEX_MINI_HIGH },
-    },
-    aliases: ['gpt-5-1-codex-mini'],
-  },
-  'gpt-5.1-codex': {
-    id: 'gpt-5.1-codex',
-    defaultEnum: ModelEnum.GPT_5_1_CODEX_MEDIUM,
-    variants: {
-      low: { enumValue: ModelEnum.GPT_5_1_CODEX_LOW },
-      medium: { enumValue: ModelEnum.GPT_5_1_CODEX_MEDIUM },
-      high: { enumValue: ModelEnum.GPT_5_1_CODEX_HIGH },
-    },
-    aliases: ['gpt-5-1-codex'],
-  },
-  'gpt-5.1-codex-max': {
-    id: 'gpt-5.1-codex-max',
-    defaultEnum: ModelEnum.GPT_5_1_CODEX_MAX_MEDIUM,
-    variants: {
-      low: { enumValue: ModelEnum.GPT_5_1_CODEX_MAX_LOW },
-      medium: { enumValue: ModelEnum.GPT_5_1_CODEX_MAX_MEDIUM },
-      high: { enumValue: ModelEnum.GPT_5_1_CODEX_MAX_HIGH },
-    },
-    aliases: ['gpt-5-1-codex-max'],
-  },
-  // O series
-  o3: {
-    id: 'o3',
-    defaultEnum: ModelEnum.O3,
-    variants: {
-      low: { enumValue: ModelEnum.O3_LOW },
-      high: { enumValue: ModelEnum.O3_HIGH },
+      low: { enumValue: ModelEnum.GPT_5_LOW, description: 'Lower reasoning' },
+      high: { enumValue: ModelEnum.GPT_5_HIGH, description: 'Higher reasoning' },
+      nano: { enumValue: ModelEnum.GPT_5_NANO, description: 'Smaller footprint' },
     },
   },
   'o3-pro': {
     id: 'o3-pro',
     defaultEnum: ModelEnum.O3_PRO,
     variants: {
-      low: { enumValue: ModelEnum.O3_PRO_LOW },
-      high: { enumValue: ModelEnum.O3_PRO_HIGH },
+      low: { enumValue: ModelEnum.O3_PRO_LOW, description: 'Lower reasoning' },
+      high: { enumValue: ModelEnum.O3_PRO_HIGH, description: 'Higher reasoning' },
     },
   },
   'o4-mini': {
     id: 'o4-mini',
     defaultEnum: ModelEnum.O4_MINI,
     variants: {
-      low: { enumValue: ModelEnum.O4_MINI_LOW },
-      high: { enumValue: ModelEnum.O4_MINI_HIGH },
+      low: { enumValue: ModelEnum.O4_MINI_LOW, description: 'Lower reasoning' },
+      high: { enumValue: ModelEnum.O4_MINI_HIGH, description: 'Higher reasoning' },
     },
   },
+
 };
 
 const VARIANT_NAME_SET = new Set<string>();
