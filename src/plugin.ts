@@ -1314,6 +1314,16 @@ export const createWindsurfPlugin =
           {
             type: 'oauth' as const,
             label: 'Sign in with Cognition (Windsurf)',
+            // Explicit empty prompts array. Per @opencode-ai/plugin's
+            // AuthHook type, `prompts` is optional — but opencode CLI
+            // v1.15.6 (and possibly later) dereferences `method.prompts`
+            // without a null-check in its login picker, crashing with
+            // `undefined is not an object (evaluating 'C.prompts')`
+            // when the field is absent. Providing an empty array is the
+            // smallest workaround and is type-clean.
+            //
+            // GitHub issue: rsvedant/opencode-windsurf-auth#13
+            prompts: [],
             async authorize() {
               // Two-stage: prepareLogin BINDS the loopback NOW and returns
               // the URL with the real port. Without this, our previous
