@@ -229,7 +229,6 @@ bun test
 - **macOS focus** — Linux works end-to-end; Windows is untested (loopback callback path and credentials directory both portable in theory)
 - **Tool descriptions over ~7,000 chars get truncated** — cloud-side validator rejects longer ones with a misleading "MCP configuration issue" error; we truncate to 6,998 chars client-side
 - **No multi-account / token-rotation yet** — a single signed-in account at a time
-- **Some legacy model names are deprecated upstream.** The plugin still resolves all 94 names listed in `opencode_config_example.json` — but Cognition's cloud has retired 38 of them and responds with `"an internal error occurred"` when called. Affected families: `claude-code`; `gpt-4`/`gpt-4-turbo`/`gpt-4o-mini`/`gpt-4.1-mini`/`gpt-4.1-nano`/`gpt-5` (root, the `:nano` variant still works); `o3-pro` and `o4-mini` (entire families); `gemini-2.0-flash`/`gemini-2.5-flash` (+thinking/lite)/`gemini-3.0-pro`; `deepseek-v3`/`deepseek-v3-2`/`deepseek-r1` (use `deepseek-v4`); all `llama-*`; all `qwen-*`; `grok-2`/`grok-code-fast`; `mistral-7b`; `glm-4.5-fast`/`glm-4.6`(+fast)/`glm-4.7-fast` (use `glm-5.1`); `minimax-m2` (use `minimax-m2.5`). The 56 still-served families include every Claude (3.5+), GPT-5.x non-deprecated, Gemini 2.5-pro / 3.0-flash / 3.1-pro / 3.5-flash, `swe-1.5`/`swe-1.6`, `kimi-k2.5`/`kimi-k2.6`, `deepseek-v4`, `glm-5.1`, `minimax-m2.5`, `gpt-oss-120b`, `o3`. Run `opencode run --model=windsurf/<name> "hi"` to probe live.
 
 ## Further Reading
 
