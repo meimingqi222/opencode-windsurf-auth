@@ -2,76 +2,37 @@
 
 [![npm version](https://img.shields.io/npm/v/opencode-windsurf-auth.svg)](https://www.npmjs.com/package/opencode-windsurf-auth)
 [![npm beta](https://img.shields.io/npm/v/opencode-windsurf-auth/beta.svg?label=beta)](https://www.npmjs.com/package/opencode-windsurf-auth)
-[![npm downloads](https://img.shields.io/npm/dw/opencode-windsurf-codeium.svg)](https://www.npmjs.com/package/opencode-windsurf-auth)
+[![npm downloads](https://img.shields.io/npm/dw/opencode-windsurf-auth.svg)](https://www.npmjs.com/package/opencode-windsurf-auth)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 
-Opencode plugin that registers Windsurf/Cognition as a model provider. Sign in with `opencode auth login` → "Cognition (Windsurf)" and use any of the 100+ Cascade models (Claude, GPT-5, Gemini, SWE-1.6, Kimi K2.6, …) directly from opencode.
+> Use Windsurf models in [opencode](https://opencode.ai/): Claude, GPT, Gemini, Kimi, DeepSeek, SWE-1.6, and more with your existing Windsurf subscription. All via Windsurf OAuth, no app required.
 
-## Features
+## Install
 
-- **`opencode auth login` integration** — Cognition (Windsurf) shows up as a provider in opencode's native auth picker; browser-based sign-in via loopback callback (just like Google/GitHub providers)
-- **Cloud-direct streaming, no install required** — talks to `server.codeium.com` over HTTPS; **no local `language_server`, no Windsurf dependency**
-- **OpenAI-compatible `/v1/chat/completions` proxy** — full streaming SSE per spec (delta.role on first chunk, delta.content/reasoning/tool_calls, separate finish + usage chunks, `data: [DONE]`)
-- **MCP tools + full system prompt** — opencode hands every tool, every MCP server, the entire system prompt to the cloud, identical to any other provider
-- **Multimodal** — text + image content parts
-- **Tenant-aware** — honors `apiServerUrl` from RegisterUser (self-serve, EU, FedRAMP, enterprise portals)
-
-## Overview
-
-This plugin enables Opencode users to access Windsurf models by leveraging their existing Windsurf subscription. It communicates directly with the Cognition cloud API, no local Windsurf installation required.
-
-## Prerequisites
-
-- An opencode install (this plugin loads via opencode's plugin system)
-- A Windsurf account at [windsurf.com](https://windsurf.com)
-- Bun (opencode's runtime)
-
-You do **NOT** need Windsurf installed.
-
-## Installation
+### Option A - one-line wizard (recommended)
 
 ```bash
-bun add opencode-windsurf-auth@beta
+curl -fsSL https://raw.githubusercontent.com/rsvedant/opencode-windsurf-auth/master/install.sh | bash
 ```
 
-Add to `~/.config/opencode/opencode.json`:
+The wizard backs up your existing `~/.config/opencode/opencode.json`, merges in the plugin entry + a curated 7-model `provider.windsurf` block (additive, your other settings are untouched), then launches `opencode auth login --provider windsurf` so you can sign in.
 
-```json
-{
-  "$schema": "https://opencode.ai/config.json",
-  "plugin": ["opencode-windsurf-auth@beta"]
-}
-```
+Flags:
 
-## Sign in
+| Flag | Effect |
+|---|---|
+| `--no-login` | Skip the sign-in step (run `opencode auth login --provider windsurf` later) |
+| `--force` | Overwrite an existing `provider.windsurf` block (default: keep what's there) |
+| `--help` | Show usage and exit |
 
+Pass them through the pipe:
 ```bash
-opencode auth login
-# → pick "Cognition (Windsurf)"
-# → browser opens; sign in
-# → opencode stores the credential
+curl -fsSL https://raw.githubusercontent.com/rsvedant/opencode-windsurf-auth/master/install.sh | bash -s -- --no-login
 ```
 
-Or use the standalone CLI (useful for headless setups):
+### Option B - manual
 
-```bash
-npx opencode-windsurf-auth login           # browser + loopback
-npx opencode-windsurf-auth login --manual  # for environments without a GUI or open port
-npx opencode-windsurf-auth status          # show credential path + account
-npx opencode-windsurf-auth whoami          # print name + apiServerUrl
-npx opencode-windsurf-auth logout          # delete credentials
-```
-
-Credentials live at the XDG-config location (mode `0600`):
-- Linux: `~/.config/opencode-windsurf-auth/credentials.json`
-- macOS: `~/Library/Application Support/opencode-windsurf-auth/credentials.json` (XDG → Cocoa-style path)
-- Windows: `%APPDATA%\opencode-windsurf-auth\credentials.json`
-
-`opencode auth logout windsurf` also clears them on the next plugin load.
-
-## Opencode Configuration
-
-The plugin starts a local proxy on `127.0.0.1:42100` (random free port on fallback) and updates `chat.params.options.baseURL` automatically. You only need to declare the provider + which models you want exposed. Set `"name": "Cognition (Windsurf)"` if you want the picker label to match opencode's auth UI. The full ready-to-paste example is in [`opencode_config_example.json`](opencode_config_example.json).
+Paste this into `~/.config/opencode/opencode.json`:
 
 ```json
 {
@@ -81,9 +42,7 @@ The plugin starts a local proxy on `127.0.0.1:42100` (random free port on fallba
     "windsurf": {
       "name": "Cognition (Windsurf)",
       "npm": "@ai-sdk/openai-compatible",
-      "options": {
-        "baseURL": "http://127.0.0.1:42100/v1"
-      },
+      "options": { "baseURL": "http://127.0.0.1:42100/v1" },
       "models": {
         "claude-opus-4.7": {
           "name": "Claude Opus 4.7",
@@ -105,10 +64,6 @@ The plugin starts a local proxy on `127.0.0.1:42100` (random free port on fallba
             "none-priority": {}, "low-priority": {}, "medium-priority": {}, "high-priority": {}, "xhigh-priority": {}
           }
         },
-        "deepseek-v4": {
-          "name": "DeepSeek V4",
-          "limit": { "context": 1000000, "output": 384000 }
-        },
         "kimi-k2.6": {
           "name": "Kimi K2.6",
           "limit": { "context": 262144, "output": 262144 },
@@ -127,9 +82,18 @@ The plugin starts a local proxy on `127.0.0.1:42100` (random free port on fallba
           "limit": { "context": 1000000, "output": 128000 },
           "attachment": true,
           "modalities": { "input": ["text", "image"], "output": ["text"] },
-          "variants": {
-            "thinking": {}, "1m": {}, "thinking-1m": {}, "fast": {}, "thinking-fast": {}
-          }
+          "variants": { "thinking": {}, "1m": {}, "thinking-1m": {}, "fast": {}, "thinking-fast": {} }
+        },
+        "swe-1.6": {
+          "name": "SWE 1.6",
+          "limit": { "context": 1000000, "output": 128000 },
+          "attachment": true,
+          "modalities": { "input": ["text", "image"], "output": ["text"] },
+          "variants": { "fast": {}, "fast-low": {}, "fast-medium": {}, "fast-high": {} }
+        },
+        "deepseek-v4": {
+          "name": "DeepSeek V4",
+          "limit": { "context": 1000000, "output": 384000 }
         }
       }
     }
@@ -137,106 +101,144 @@ The plugin starts a local proxy on `127.0.0.1:42100` (random free port on fallba
 }
 ```
 
-After saving the config:
-
+Sign in:
 ```bash
-opencode models windsurf                                       # confirm models appear under windsurf/
-opencode run --model=windsurf/swe-1.6 "hi"                     # free-tier smoke test
-opencode run --model=windsurf/claude-opus-4.7:high "hi"        # paid models
+opencode auth login --provider windsurf
+# → browser opens; sign in with your Windsurf account
+# → credential is saved automatically
 ```
 
-## Project Layout
+Want the full catalog (94 models, all variants)? Copy [`opencode_config_example.json`](opencode_config_example.json) verbatim.
+
+## Use
+
+```bash
+opencode run --model=windsurf/swe-1.6 "hi"
+opencode run --model=windsurf/claude-opus-4.7:high "what does this codebase do?"
+opencode run --model=windsurf/kimi-k2.6 -f screenshot.png -- "describe this image"
+```
+
+Variants pass through as model suffixes (`:low`, `:high`, `:thinking`, etc.) — same syntax Windsurf's own clients use.
+
+## Image attachments
+
+Models with `"attachment": true` in your config accept image content parts via opencode's `-f <path>` flag (and the TUI's paste/drag-drop). The 7-model curated set above marks six as image-capable (everything except `deepseek-v4`). The full 94-model catalog in [`opencode_config_example.json`](opencode_config_example.json) flags 55 models as image-capable based on per-model verification against [models.dev](https://models.dev). Append custom models without the `attachment` flag and opencode automatically blocks image attachment in the UI.
+
+## Sign in / sign out
+
+```bash
+opencode auth login --provider windsurf   # browser-based, recommended
+opencode auth logout windsurf             # clears the credential
+
+# Headless / SSH / no-browser fallback:
+npx opencode-windsurf-auth login --manual
+npx opencode-windsurf-auth whoami         # show signed-in account
+npx opencode-windsurf-auth status         # show credentials path + version
+```
+
+Credentials are stored mode `0600` at the XDG-config location opencode itself uses, on every platform:
+
+- Linux + macOS + Windows: `~/.config/opencode-windsurf-auth/credentials.json`
+
+(opencode doesn't honor `%APPDATA%` on Windows either, it follows XDG conventions everywhere — so the plugin's credentials sit next to opencode's own config.)
+
+## How it works
+
+opencode loads the plugin from npm via its own cache. The plugin binds a Bearer-gated local proxy at `127.0.0.1:42100`, translates OpenAI-shaped chat requests into Cognition's Connect-RPC `GetChatMessage` wire format, and streams the response back as OpenAI SSE. Tool calls, MCP servers, reasoning deltas, token usage, image attachments — all wired through. No `language_server` runs. Auth uses a loopback OAuth callback on a random ephemeral port; the long-lived `api_key` from `RegisterUser` is then exchanged for a short-lived `user_jwt` on every chat. For the wire-protocol details see [docs/CASCADE_PROTOCOL.md](docs/CASCADE_PROTOCOL.md).
+
+## Troubleshooting
+
+<details>
+<summary><strong>Port 42100 is already in use</strong></summary>
+
+Another process holds `127.0.0.1:42100`. Find and stop it:
+
+```bash
+lsof -nP -iTCP:42100 -sTCP:LISTEN
+kill -9 <PID>
+```
+
+The plugin refuses to silently adopt a foreign listener on that port because a squatter could otherwise capture your prompts. Re-run `opencode auth login` after killing the squatter.
+</details>
+
+<details>
+<summary><strong>Sign-in browser didn't open / headless host</strong></summary>
+
+The CLI fallback prints a URL you can click manually:
+
+```bash
+npx opencode-windsurf-auth login --manual
+```
+
+Or paste the URL it shows into any browser on a machine that can reach your headless host (the loopback callback won't work cross-host, so use `--manual` for fully-headless setups).
+</details>
+
+<details>
+<summary><strong>Model says "I can't read images"</strong></summary>
+
+Only models with `"attachment": true` in your `opencode.json` will receive image content from opencode. If you added a custom model and want image attachments, add:
+
+```json
+"attachment": true,
+"modalities": { "input": ["text", "image"], "output": ["text"] }
+```
+
+(Adding the flag to a model that doesn't actually support vision will still let opencode attach the image, but the model will respond with "I can't read images" — that's the model talking, not the plugin.)
+</details>
+
+<details>
+<summary><strong>"Cognition (Windsurf)" doesn't show up in <code>opencode auth login</code></strong></summary>
+
+Confirm the plugin entry is present:
+
+```bash
+jq '.plugin' ~/.config/opencode/opencode.json
+# Should contain "opencode-windsurf-auth@beta"
+```
+
+Then nuke opencode's plugin cache so it re-resolves from npm:
+
+```bash
+rm -rf ~/.cache/opencode/packages/opencode-windsurf-auth@beta
+opencode auth login
+```
+</details>
+
+## Project layout
 
 ```
 src/
-├── plugin.ts                  # Proxy server + opencode auth.methods + chat.params hooks
-├── cli.ts                     # `opencode-windsurf-auth` CLI (login/logout/whoami/status)
-├── cloud-direct/              # Direct cloud streaming
-│   ├── chat.ts                # GetChatMessage stream → text/reasoning/tool_calls/usage events
-│   ├── wire.ts                # Hand-rolled proto + Connect-RPC framing
-│   ├── auth.ts                # GetUserJwt mint + cache
-│   └── metadata.ts            # Metadata proto builder
-├── oauth/                     # Browser OAuth flow
-│   ├── login.ts               # `prepareLogin` (loopback + openBrowser) and manual-paste fallback
-│   ├── register-user.ts       # POST register.windsurf.com → {apiKey, name, apiServerUrl}
-│   ├── storage.ts             # ~/.config/opencode-windsurf-auth/credentials.json (O_EXCL lock, mode 0600)
-│   └── types.ts               # Region + persisted-credentials shape
+├── plugin.ts                # Proxy server + opencode hooks (auth + chat.params)
+├── cli.ts                   # `opencode-windsurf-auth` standalone CLI
+├── cloud-direct/            # Cognition Connect-RPC wire client
+│   ├── chat.ts              # GetChatMessage stream + SSE adapter
+│   ├── wire.ts              # Proto + Connect framing
+│   ├── auth.ts              # GetUserJwt mint + cache
+│   └── metadata.ts          # Metadata proto builder
+├── oauth/                   # OAuth flow + credentials.json
+│   ├── login.ts             # Loopback + manual-paste sign-in
+│   ├── register-user.ts     # POST register.windsurf.com → api_key
+│   └── storage.ts           # O_EXCL-locked, mode-0600 atomic write
 └── plugin/
-    ├── credentials-resolver.ts # Cloud-direct only; legacy modes documented but commented out
-    ├── models.ts               # ~110 models with variants; auto-generated from GetCascadeModelConfigs
-    ├── auth.ts                 # WindsurfCredentials/WindsurfError types (legacy helpers retired)
-    ├── discovery.ts            # `GET /v1/models` source
-    ├── protobuf.ts             # Shared varint/string helpers
-    └── types.ts                # ModelEnum integer values for legacy aliases
+    ├── credentials-resolver.ts
+    └── models.ts            # 110+ canonical model IDs + variant resolver
 ```
-
-### How It Works
-
-1. **Auth (opencode auth login)**: opencode invokes `auth.methods[0].authorize()`. We pre-bind a loopback HTTP server on a random ephemeral port, open the browser to `windsurf.com/windsurf/signin?redirect_uri=http://127.0.0.1:<port>/auth&…`, wait for the callback, exchange the `access_token` (Cognition `ott$…` one-time format) via `RegisterUser` → long-lived api_key. Persist + return to opencode.
-2. **Per-chat flow**: opencode hits our `127.0.0.1:42100/v1/chat/completions` proxy. We translate the OpenAI-shaped request into a Cognition `GetChatMessage` proto (system messages inlined into user turn, tool descriptions truncated at 6,998 chars to satisfy the cloud validator) and stream the response back as OpenAI SSE.
-3. **Wire decode** (`src/cloud-direct/chat.ts`): proto field `#3` = visible text → `delta.content`; field `#9` = reasoning/CoT → `delta.reasoning`; field `#6` = tool-call deltas → `delta.tool_calls`; field `#5` = StopReason enum → `finish_reason`; field `#28` = token usage block → final usage chunk.
-4. **Tool calling**: every opencode tool + MCP server tool reaches the cloud; tool execution stays opencode-side. The cloud returns `STOP_REASON_FUNCTION_CALL` (`10`) when it wants a tool invoked.
-5. **Usage**: input/output token counts surface as a separate `{choices: [], usage: {…}}` chunk before `data: [DONE]`, per OpenAI's `stream_options.include_usage: true` convention.
-
-### Supported Models
-
-Addressed as `windsurf/<name>` (or `windsurf/<name>:<variant>`). Grouped by vendor, newest-first within each group:
-
-**Anthropic** — `claude-opus-4.7` (variants `low`/`medium`/`high`/`xhigh`/`max` plus their `-fast` priority-routing twins, 10 total), `claude-opus-4.6` (`thinking`, `1m`, `thinking-1m`, `fast`, `thinking-fast`), `claude-opus-4.5` (+`thinking`), `claude-sonnet-4.6` (`thinking`, `1m`, `thinking-1m`), `claude-sonnet-4.5`, `claude-4.5-opus` (+`thinking`), `claude-4.5-sonnet` (+`thinking`), `claude-4.1-opus` (+`thinking`), `claude-4-opus` (+`thinking`), `claude-4-sonnet` (+`thinking`), `claude-3.7-sonnet` (+`thinking`), `claude-3.5-sonnet`, `claude-3.5-haiku`, `claude-3-opus`, `claude-3-sonnet`, `claude-3-haiku`, `claude-code`.
-
-**OpenAI** — `gpt-5.5`, `gpt-5.4`, `gpt-5.4-mini`, `gpt-5.3-codex`, `gpt-5.2`, `gpt-5.2-codex`, `gpt-5.1-codex-max`, `gpt-5.1-codex`, `gpt-5.1-codex-mini`, `gpt-5-codex`, `gpt-5` (variants `low`/`high`/`nano`), `gpt-4.1` (+`mini`, +`nano`), `gpt-4o` (+`mini`), `gpt-4-turbo`, `gpt-4`, `o4-mini` (+`low`/`high`), `o3-pro` (+`low`/`high`), `o3` (+`low`/`high`), `o3-mini`, `gpt-oss-120b`. Reasoning models expose tiers as variants (`low`/`medium`/`high`/`xhigh`, sometimes `none`, plus `-priority` twins).
-
-**Google** — `gemini-3.5-flash` (`minimal`/`low`/`medium`/`high`), `gemini-3.1-pro` (`low`/`high`), `gemini-3.0-pro` (`minimal`/`low`/`medium`/`high`), `gemini-3.0-flash` (`minimal`/`low`/`medium`/`high`), `gemini-2.5-pro`, `gemini-2.5-flash` (+`thinking`, +`lite`), `gemini-2.0-flash`.
-
-**DeepSeek** — `deepseek-v4`, `deepseek-v3-2`, `deepseek-v3`, `deepseek-r1` (+`fast`, +`slow`).
-
-**z.ai** — `glm-5.1`, `glm-4.7` (+`fast`), `glm-4.6` (+`fast`), `glm-4.5` (+`fast`).
-
-**Moonshot** — `kimi-k2.6`, `kimi-k2.5`, `kimi-k2-thinking`, `kimi-k2`.
-
-**MiniMax** — `minimax-m2.5`, `minimax-m2.1`, `minimax-m2`.
-
-**xAI** — `grok-3` (+`mini`), `grok-2`, `grok-code-fast`.
-
-**Meta** — `llama-3.3-70b` (+`r1`), `llama-3.1-405b`, `llama-3.1-70b`, `llama-3.1-8b`.
-
-**Alibaba** — `qwen-3-coder-480b` (+`fast`), `qwen-3-235b`, `qwen-2.5-72b`, `qwen-2.5-32b` (+`r1`), `qwen-2.5-7b`.
-
-**Mistral** — `mistral-7b`.
-
-**Cognition / Windsurf** — `swe-1.6` (+`fast`), `swe-1.5` (+`thinking`, +`slow`).
-
-The list **varies per account** — call `GET http://127.0.0.1:42100/v1/models` once the plugin is loaded to see what your plan exposes. Variants are addressable two ways: `windsurf/claude-opus-4.7:high` (colon form, preferred) or `windsurf/claude-opus-4-7-high` (dash form, accepted as alias). Declare them under `provider.windsurf.models[model].variants` in your opencode config — see `opencode_config_example.json`.
 
 ## Development
 
 ```bash
-# Install dependencies
+git clone https://github.com/rsvedant/opencode-windsurf-auth.git
+cd opencode-windsurf-auth
 bun install
-
-# Build
-bun run build
-
-# Type check
 bun run typecheck
-
-# Run tests
+bun run build
 bun test
 ```
 
-## Known Limitations
+## Further reading
 
-- **macOS focus** — Linux works end-to-end; Windows is untested (loopback callback path and credentials directory both portable in theory)
-- **Tool descriptions over ~7,000 chars get truncated** — cloud-side validator rejects longer ones with a misleading "MCP configuration issue" error; we truncate to 6,998 chars client-side
-- **No multi-account / token-rotation yet** — a single signed-in account at a time
-
-## Further Reading
-
-- [docs/CASCADE_PROTOCOL.md](https://github.com/rsvedant/opencode-windsurf-auth/blob/master/docs/CASCADE_PROTOCOL.md) – **Windsurf 2.x findings.** Why `RawGetChatMessage` is dead, how the Cascade flow works, why model UIDs are now strings instead of proto enum numbers, metadata field requirements, etc.
-- [docs/WINDSURF_API_SPEC.md](https://github.com/rsvedant/opencode-windsurf-auth/blob/master/docs/WINDSURF_API_SPEC.md) – gRPC endpoints & protobuf notes
-- [docs/REVERSE_ENGINEERING.md](https://github.com/rsvedant/opencode-windsurf-auth/blob/master/docs/REVERSE_ENGINEERING.md) – credential discovery + tooling (Windsurf 1.x era; supplement with CASCADE_PROTOCOL.md)
-- [opencode-antigravity-auth](https://github.com/NoeFabris/opencode-antigravity-auth) – related project
+- [docs/CASCADE_PROTOCOL.md](docs/CASCADE_PROTOCOL.md) — Windsurf 2.x wire-format notes (why `RawGetChatMessage` is dead, why model UIDs are now strings, required metadata fields, etc.)
 
 ## License
 
-MIT
+[MIT](LICENSE)
