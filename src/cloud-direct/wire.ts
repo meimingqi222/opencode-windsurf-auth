@@ -22,8 +22,19 @@ import * as zlib from 'zlib';
 // ----------------------------------------------------------------------------
 
 export function encodeVarint(value: number | bigint): Buffer {
+  const v0 = BigInt(value);
+  // Reject negatives at the boundary. Proto3 spec encodes signed types as
+  // 10-byte sign-extended varints; we don't support that here and the
+  // current call sites never need it (tags, lengths, request ids — all
+  // strictly positive). The old loop body would have terminated with
+  // `Number(-1n)` = -1, producing a malformed single 0xFF byte that the
+  // server would misparse silently. Throw instead so future regressions
+  // surface immediately.
+  if (v0 < 0n) {
+    throw new RangeError(`encodeVarint: negative input not supported (got ${value})`);
+  }
   const bytes: number[] = [];
-  let v = BigInt(value);
+  let v = v0;
   while (v > 127n) {
     bytes.push(Number(v & 0x7fn) | 0x80);
     v >>= 7n;

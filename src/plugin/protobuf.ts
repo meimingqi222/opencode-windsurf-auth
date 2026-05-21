@@ -9,10 +9,15 @@
  * functions being duplicated and drifting; do not re-inline them anywhere.
  */
 
-/** Unsigned varint encode. */
+/** Unsigned varint encode. Throws on negative input — see comment in
+ * `src/cloud-direct/wire.ts:encodeVarint` for the rationale. */
 export function encodeVarint(value: number | bigint): number[] {
+  const v0 = BigInt(value);
+  if (v0 < 0n) {
+    throw new RangeError(`encodeVarint: negative input not supported (got ${value})`);
+  }
   const bytes: number[] = [];
-  let v = BigInt(value);
+  let v = v0;
   while (v > 127n) {
     bytes.push(Number(v & 0x7fn) | 0x80);
     v >>= 7n;

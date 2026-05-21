@@ -701,41 +701,15 @@ function getGlobalKey(): string {
  * in our heap). DNS-rebinding browser tabs are blocked by Origin check.
  */
 /**
- * Memoized apiKey loaded from `credentials.json`. The Bearer-validation
- * path runs on every chat request; without memoization a 100-turn
- * session hits the disk 100× (and worse under parallel tool calls).
- *
- * TTL is intentionally short (2s) so credential rotation propagates
- * promptly — if the user logs out + back in mid-session, the next
- * request after 2s sees the new key. clearAuthCache() can force a
- * refresh sooner (called from the logout path).
+ * Async auth gate. Both the Bearer-validation path AND the chat handler's
+ * `resolveCredentials()` call now read through the SAME cache layer
+ * (`resolveCache` in credentials-resolver.ts), guaranteeing that the
+ * apiKey we validate the Bearer against and the apiKey we forward
+ * upstream are the same snapshot. Previously these were two independent
+ * 2s caches that could diverge across an external credential rotation,
+ * letting a request authenticated against key-A get forwarded with key-B.
  */
-const AUTH_CACHE_TTL_MS = 2_000;
-let authCacheValue: string | null = null;
-let authCacheExpiry = 0;
-
-function getAuthCacheEntry(): string | null {
-  const now = Date.now();
-  if (now < authCacheExpiry) return authCacheValue;
-  const creds = loadOAuthCredentials();
-  authCacheValue = creds && typeof creds.apiKey === 'string' && creds.apiKey.length > 0
-    ? creds.apiKey
-    : null;
-  authCacheExpiry = now + AUTH_CACHE_TTL_MS;
-  return authCacheValue;
-}
-
-/**
- * Drop the memoized apiKey immediately. Called from the loader's logout
- * branch so a `opencode auth logout windsurf` invalidation can't keep
- * authorizing requests for up to 2s afterward.
- */
-function clearAuthCache(): void {
-  authCacheValue = null;
-  authCacheExpiry = 0;
-}
-
-function authorizeProxyRequest(req: Request): Response | null {
+async function authorizeProxyRequest(req: Request): Promise<Response | null> {
   // 1. Origin gate (HARD) — block browser tabs claiming a foreign origin.
   const origin = req.headers.get('origin');
   if (origin) {
@@ -777,21 +751,15 @@ function authorizeProxyRequest(req: Request): Response | null {
     return null;
   }
 
-  // Otherwise, check the persisted credentials. To avoid hammering disk
-  // (loadCredentials does existsSync+lstat+stat+chmod+read+parse on every
-  // request — N chat turns = N FS hits, serializing under parallel
-  // tool-loop pressure), we cache the loaded apiKey for a short TTL.
-  // The TTL is short enough that a credential rotation propagates within
-  // a few seconds — if a user logs out + back in mid-session, the next
-  // request after the TTL will see the new key. Inside the TTL, we use
-  // the memoized value AND validate the Bearer against it; this also
-  // closes the TOCTOU window where the auth gate validated key-A but
-  // the chat handler then read key-B from disk a moment later (now
-  // both reads share the cache).
+  // Otherwise, validate against the persisted credentials' apiKey. We
+  // route through `resolveCredentials()` (shared with the chat handler)
+  // so the Bearer we authenticate against is THE SAME snapshot the chat
+  // handler will forward upstream — no TOCTOU between the auth gate and
+  // the chat path even under external file rotation.
   try {
-    const cached = getAuthCacheEntry();
-    if (cached) {
-      const credBuf = Buffer.from(cached, 'utf8');
+    const creds = await resolveCredentials();
+    if (creds.apiKey && creds.apiKey.length > 0) {
+      const credBuf = Buffer.from(creds.apiKey, 'utf8');
       if (
         presentedBuf.length === credBuf.length &&
         crypto.timingSafeEqual(presentedBuf, credBuf)
@@ -799,7 +767,7 @@ function authorizeProxyRequest(req: Request): Response | null {
         return null;
       }
     }
-  } catch { /* fall through to 401 */ }
+  } catch { /* not authenticated / missing creds → fall through to 401 */ }
 
   return openAIError(401, 'Unauthorized: Authorization header did not match the expected credential.');
 }
@@ -850,7 +818,7 @@ async function ensureWindsurfProxyServer(): Promise<string> {
 
       // Every other endpoint requires the per-process Bearer secret +
       // loopback origin.
-      const blocked = authorizeProxyRequest(req);
+      const blocked = await authorizeProxyRequest(req);
       if (blocked) return blocked;
 
       // Models endpoint
@@ -1307,14 +1275,12 @@ export const createWindsurfPlugin =
               // logout immediately stops authorizing requests:
               //  - JWT cache (would otherwise keep working for ~24min)
               //  - sessionId cache (server-side context tied to the key)
-              //  - auth-gate's apiKey memo (Bearer validation, 2s TTL)
-              //  - resolveCredentials memo (chat handler's view, 2s TTL)
+              //  - resolveCredentials memo (shared by auth gate + chat handler)
               try {
                 const { clearCachedUserJwt } = await import('./cloud-direct/auth.js');
                 clearCachedUserJwt();
                 const { clearSessionIds } = await import('./cloud-direct/chat.js');
                 clearSessionIds();
-                clearAuthCache();
                 const { clearResolveCache } = await import('./plugin/credentials-resolver.js');
                 clearResolveCache();
               } catch { /* best-effort */ }
