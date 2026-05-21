@@ -3,25 +3,27 @@ name: Publish to npm
 # Publish flow:
 #   1. Push a git tag `v<x.y.z>` matching package.json's "version" field.
 #   2. CI checks out, installs, typechecks, runs unit tests, builds.
-#   3. `npm publish --provenance` makes the version the new `latest`.
-#   4. `npm dist-tag add ... beta` then points the `beta` tag at the same version,
-#      so `bun add opencode-windsurf-auth@beta` keeps working.
+#   3. `npm publish --provenance --tag beta` publishes the version AND
+#      atomically sets the `beta` dist-tag in a single OIDC-authenticated
+#      step. No separate `npm dist-tag add` call.
+#
+# Promoting a beta to stable (one-time, when you're ready):
+#   npm dist-tag add opencode-windsurf-auth@<version> latest
 #
 # Manual override: `workflow_dispatch` (with optional `dry_run`) lets you
 # rehearse the pipeline without publishing.
 #
-# Auth (hybrid):
-#   - `npm publish` uses npm Trusted Publisher (OIDC) — no long-lived secret.
-#     Configure once at:
+# Auth:
+#   - `npm publish --tag beta` uses npm Trusted Publisher (OIDC). No
+#     long-lived secret — `id-token: write` is the only permission needed.
+#     Configure the publisher once at:
 #       https://www.npmjs.com/package/opencode-windsurf-auth/access
 #     Publisher = GitHub Actions, org = rsvedant,
 #     repo = opencode-windsurf-auth, workflow filename = publish.yml.
-#   - `npm dist-tag add` falls back to NPM_TOKEN because npm's OIDC flow
-#     is scoped to `publish` only and doesn't cover dist-tag operations.
-#     Create a Granular Access Token at
-#       https://www.npmjs.com/settings/<user>/tokens/granular-access-tokens/new
-#     scoped to package `opencode-windsurf-auth` with read+write access,
-#     then save it as the `NPM_TOKEN` repo secret.
+#   - We removed the separate `npm dist-tag add` step (and its `NPM_TOKEN`
+#     dependency) because npm's OIDC scope only covers `publish`, and the
+#     dist-tag command requires a 2FA OTP which CI can't supply. Folding
+#     beta into the publish step itself works around that entirely.
 
 on:
   push:
@@ -30,7 +32,7 @@ on:
   workflow_dispatch:
     inputs:
       dry_run:
-        description: 'Skip the publish + dist-tag steps (rehearsal only)'
+        description: 'Skip the publish step (rehearsal only)'
         type: boolean
         default: false
 
@@ -99,18 +101,16 @@ jobs:
       - name: Build
         run: bun run build
 
-      - name: Publish to npm (latest)
+      - name: Publish to npm (beta)
         if: ${{ inputs.dry_run != true }}
-        run: npm publish --provenance --access public
-
-      - name: Point beta dist-tag at the new version
-        if: ${{ inputs.dry_run != true }}
-        run: npm dist-tag add "opencode-windsurf-auth@${{ steps.version.outputs.version }}" beta
-        env:
-          # OIDC token from `npm publish` isn't reused for dist-tag — npm's
-          # Trusted Publisher flow only authenticates the publish operation.
-          # Falls back to the granular NPM_TOKEN scoped just to this package.
-          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+        # --tag beta makes this publish atomically set the `beta` dist-tag
+        # via the OIDC-authenticated publish call. The previous workflow
+        # had a separate `npm dist-tag add` step that needed a 2FA OTP
+        # (npm Trusted Publisher's OIDC scope covers `publish` only), so
+        # CI kept failing that step and `beta` would drift behind `latest`.
+        # Promote to `latest` manually when you're ready for stable:
+        #   npm dist-tag add opencode-windsurf-auth@<version> latest
+        run: npm publish --provenance --access public --tag beta
 
       - name: Summary
         run: |
@@ -118,13 +118,12 @@ jobs:
             echo "## opencode-windsurf-auth publish"
             echo ""
             if [[ "${{ inputs.dry_run }}" == "true" ]]; then
-              echo "**Dry run** — would have published \`${{ steps.version.outputs.version }}\` as \`latest\`, then pointed \`beta\` at it."
+              echo "**Dry run** — would have published \`${{ steps.version.outputs.version }}\` with the \`beta\` dist-tag."
             else
-              echo "Published \`opencode-windsurf-auth@${{ steps.version.outputs.version }}\`."
+              echo "Published \`opencode-windsurf-auth@${{ steps.version.outputs.version }}\` with the \`beta\` dist-tag."
               echo ""
-              echo "| dist-tag | version |"
-              echo "|----------|---------|"
-              echo "| latest   | ${{ steps.version.outputs.version }} |"
-              echo "| beta     | ${{ steps.version.outputs.version }} |"
+              echo "Install with: \`bun add opencode-windsurf-auth@beta\`"
+              echo ""
+              echo "Promote to \`latest\` (when ready): \`npm dist-tag add opencode-windsurf-auth@${{ steps.version.outputs.version }} latest\`"
             fi
           } >> "$GITHUB_STEP_SUMMARY"
