@@ -1,35 +1,66 @@
 import { describe, expect, test } from 'bun:test';
 import { resolveModel, getModelVariants } from '../../src/plugin/models.js';
 
-describe('resolveModel variants (bun)', () => {
-  test('defaults to base enum when no variant provided', () => {
-    const result = resolveModel('gemini-3.0-pro');
-    expect(result.modelId).toBe('gemini-3.0-pro');
+// Pins the variant-resolution contract against the live Cognition model catalog
+// (see src/plugin/models.ts auto-generated block + family-less manual entries).
+// Update these when adding/removing models.
+
+describe('resolveModel variants', () => {
+  test('defaults to family-default uid when no variant provided', () => {
+    const result = resolveModel('claude-opus-4.7');
+    expect(result.modelId).toBe('claude-opus-4.7');
+    expect(result.modelUid).toBe('claude-opus-4-7-medium');
     expect(result.variant).toBeUndefined();
   });
 
   test('resolves colon-delimited variant', () => {
-    const result = resolveModel('gemini-3.0-pro:high');
-    expect(result.modelId).toBe('gemini-3.0-pro');
+    const result = resolveModel('claude-opus-4.7:high');
+    expect(result.modelId).toBe('claude-opus-4.7');
     expect(result.variant).toBe('high');
+    expect(result.modelUid).toBe('claude-opus-4-7-high');
   });
 
-  test('resolves suffix variant with alias', () => {
-    const result = resolveModel('gemini-3-0-pro-high');
-    expect(result.modelId).toBe('gemini-3.0-pro');
+  test('resolves dash-suffix variant (hyphenated alias form)', () => {
+    const result = resolveModel('claude-opus-4-7-high');
+    expect(result.modelId).toBe('claude-opus-4.7');
     expect(result.variant).toBe('high');
+    expect(result.modelUid).toBe('claude-opus-4-7-high');
   });
 
   test('respects variant override', () => {
-    const result = resolveModel('gemini-3.0-pro', 'low');
-    expect(result.variant).toBe('low');
+    const result = resolveModel('claude-opus-4.7', 'max-fast');
+    expect(result.variant).toBe('max-fast');
+    expect(result.modelUid).toBe('claude-opus-4-7-max-fast');
+  });
+
+  test('resolves family-less models (swe-1.6 + its fast variant)', () => {
+    expect(resolveModel('swe-1.6').modelUid).toBe('swe-1-6');
+    expect(resolveModel('swe-1.6:fast').modelUid).toBe('swe-1-6-fast');
+  });
+
+  test('resolves multi-segment variants like xhigh-priority', () => {
+    expect(resolveModel('gpt-5.5:xhigh-priority').modelUid).toBe('gpt-5-5-xhigh-priority');
+  });
+
+  test('resolves legacy enum-style family (gpt-5.2 → MODEL_GPT_5_2_*)', () => {
+    expect(resolveModel('gpt-5.2:low').modelUid).toBe('MODEL_GPT_5_2_LOW');
+    expect(resolveModel('gpt-5.2:high-priority').modelUid).toBe('MODEL_GPT_5_2_HIGH_PRIORITY');
   });
 });
 
-describe('getModelVariants (bun)', () => {
-  test('returns variants list for canonical id', () => {
-    const variants = getModelVariants('gpt-5.2');
+describe('getModelVariants', () => {
+  test('returns full variant set for a multi-variant family', () => {
+    const variants = getModelVariants('claude-opus-4.7');
     expect(variants).toBeDefined();
-    expect(Object.keys(variants || {})).toContain('priority');
+    const keys = Object.keys(variants ?? {});
+    expect(keys).toContain('medium');
+    expect(keys).toContain('low');
+    expect(keys).toContain('max-fast');
+    expect(keys.length).toBeGreaterThanOrEqual(10);
+  });
+
+  test('returns undefined for single-variant families like kimi-k2.6', () => {
+    const variants = getModelVariants('kimi-k2.6');
+    expect(variants).toBeUndefined();
   });
 });
