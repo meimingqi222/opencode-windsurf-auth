@@ -914,16 +914,36 @@ export async function* streamChatEvents(req: CloudChatRequest): AsyncGenerator<C
       // Race the reader.read() against idle abort. When abort wins, we
       // also actively `cancel()` the underlying body stream so the
       // pending read() resolves promptly with done=true instead of
-      // hanging on the now-dead TCP socket until the OS notices. The
-      // previous behavior left the read pending and produced flaky
-      // unhandled-rejection warnings during cleanup.
+      // hanging on the now-dead TCP socket until the OS notices.
+      //
+      // Promise-handling carefully: the reader.read() promise can settle
+      // AFTER the outer race rejects (we cancelled, the read eventually
+      // sees the cancellation and either resolves with done=true or
+      // rejects with an abort error). We attach an explicit `.catch(()=>{})`
+      // on the read promise so any post-race rejection doesn't surface as
+      // an unhandled-rejection warning in the host runtime.
       return new Promise((resolve, reject) => {
+        let settled = false;
+        const settle = (fn: () => void): void => {
+          if (settled) return;
+          settled = true;
+          fn();
+        };
+        const readP = reader.read();
+        // Defensive: swallow any post-race rejection. If the outer promise
+        // already settled via the abort listener, we still need a handler
+        // attached to readP or Node logs an unhandledRejection.
+        readP.catch(() => { /* swallowed; outer promise already rejected */ });
+
         idleController.signal.addEventListener('abort', () => {
-          // Force the reader's read() to settle.
           try { void resp.body?.cancel(idleController.signal.reason ?? new Error('idle abort')); } catch { /* */ }
-          reject(idleController.signal.reason ?? new Error('idle abort'));
+          settle(() => reject(idleController.signal.reason ?? new Error('idle abort')));
         }, { once: true });
-        reader.read().then(resolve, reject);
+
+        readP.then(
+          (v) => settle(() => resolve(v)),
+          (e) => settle(() => reject(e)),
+        );
       });
     };
 

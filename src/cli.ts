@@ -79,6 +79,28 @@ function parseArgs(argv: string[]): ParsedArgs {
 
 function regionFromArgs(args: ParsedArgs): WindsurfRegion {
   if (!args.portalUrl) return DEFAULT_REGION;
+  // Validate the portal URL strictly. The portal URL ends up as the
+  // `registerApiServerUrl` we POST the Firebase token to, so a typo
+  // ("htp://...") or an attacker-supplied http:// URL would leak the
+  // token in plaintext or send it to an arbitrary host. Enforce:
+  //  - HTTPS only (no plaintext)
+  //  - Standard URL shape (URL constructor parseable)
+  //  - No userinfo (e.g. `https://attacker@windsurf.com/...`)
+  let parsed: URL;
+  try {
+    parsed = new URL(args.portalUrl);
+  } catch {
+    throw new Error(`--portal-url is not a valid URL: ${args.portalUrl}`);
+  }
+  if (parsed.protocol !== 'https:') {
+    throw new Error(
+      `--portal-url must use https:// (got ${parsed.protocol}). ` +
+      `The OAuth token would otherwise be sent in plaintext.`,
+    );
+  }
+  if (parsed.username || parsed.password) {
+    throw new Error('--portal-url must not include userinfo (https://user:pass@host/...).');
+  }
   // Enterprise / custom portal — mirror extension.js's _route/api_server pattern
   // for the register endpoint. The portal URL doubles as the website.
   const base = args.portalUrl.replace(/\/$/, '');

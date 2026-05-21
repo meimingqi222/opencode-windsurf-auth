@@ -453,7 +453,8 @@ function createStreamingResponse(
  */
 async function createNonStreamingResponse(
   credentials: WindsurfCredentials,
-  request: ChatCompletionRequest
+  request: ChatCompletionRequest,
+  signal?: AbortSignal,
 ): Promise<ChatCompletionResponse> {
   const responseId = `chatcmpl-${crypto.randomUUID()}`;
   const requestedModel = request.model || getDefaultModel();
@@ -496,6 +497,10 @@ async function createNonStreamingResponse(
     completionOpts: {
       maxOutputTokens: requestedMaxTokens,
     },
+    // Propagate the caller's abort so a client disconnect during a
+    // non-streaming title-gen / summary call actually stops the upstream
+    // cloud request and the billable token usage with it.
+    signal,
   })) {
     if (ev.kind === 'text') {
       collected += ev.text;
@@ -991,7 +996,9 @@ async function ensureWindsurfProxyServer(): Promise<string> {
             });
           }
 
-          const responseData = await createNonStreamingResponse(credentials, requestBody);
+          // Pass the incoming Request's abort signal so a client-disconnect
+          // mid-call propagates through to the cloud-direct stream.
+          const responseData = await createNonStreamingResponse(credentials, requestBody, req.signal);
           return new Response(JSON.stringify(responseData), {
             status: 200,
             headers: { 'Content-Type': 'application/json' },
@@ -1034,6 +1041,12 @@ async function ensureWindsurfProxyServer(): Promise<string> {
         // before the first token. Bun's idleTimeout is capped at 255s; we
         // disable it (0 = no limit) since this is a localhost-only proxy.
         idleTimeout: 0,
+        // Match the Node-path streaming cap (32 MB). Without this, Bun's
+        // default ~128 MB ceiling lets a chunked-transfer request without
+        // Content-Length buffer that much before our handler ever sees it,
+        // even though /v1/chat/completions itself does a `content-length`
+        // pre-check on the headers (which is missing on chunked uploads).
+        maxRequestBodySize: 32 * 1024 * 1024,
       });
 
     const startNodeServer = (port: number): Promise<{ port: number }> =>
@@ -1290,16 +1303,20 @@ export const createWindsurfPlugin =
               // chat path stops accepting the stale token.
               const { deleteCredentials } = await import('./oauth/storage.js');
               deleteCredentials();
-              // Also drop the in-memory JWT cache + auth cache so a
-              // long-running opencode process doesn't keep using the
-              // just-invalidated api_key for the next 2s (auth cache)
-              // or 24 min (JWT cache).
+              // Drop every layer of in-memory credential state so a
+              // logout immediately stops authorizing requests:
+              //  - JWT cache (would otherwise keep working for ~24min)
+              //  - sessionId cache (server-side context tied to the key)
+              //  - auth-gate's apiKey memo (Bearer validation, 2s TTL)
+              //  - resolveCredentials memo (chat handler's view, 2s TTL)
               try {
                 const { clearCachedUserJwt } = await import('./cloud-direct/auth.js');
                 clearCachedUserJwt();
                 const { clearSessionIds } = await import('./cloud-direct/chat.js');
                 clearSessionIds();
                 clearAuthCache();
+                const { clearResolveCache } = await import('./plugin/credentials-resolver.js');
+                clearResolveCache();
               } catch { /* best-effort */ }
             }
             // (otherwise leave credentials.json alone — likely written by our

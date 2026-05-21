@@ -61,12 +61,36 @@ function modeFromEnv(): ResolutionMode {
 }
 
 /**
+ * Memoize the on-disk credential read for a short TTL. The proxy auth
+ * gate and the chat handler both used to call `loadCredentials()`
+ * independently per request, opening a TOCTOU window: the auth gate
+ * could validate a Bearer against key-A, then a credential rotation
+ * landed, and the chat handler would forward the request with key-B.
+ *
+ * Sharing one short-lived snapshot closes that window for the lifetime
+ * of a single chat turn while still letting credential rotation
+ * propagate within ~2s.
+ */
+const RESOLVE_CACHE_TTL_MS = 2_000;
+let resolveCache: { value: WindsurfCredentials | null; expiry: number } = { value: null, expiry: 0 };
+
+export function clearResolveCache(): void {
+  resolveCache = { value: null, expiry: 0 };
+}
+
+/**
  * Resolve credentials for chat. Cloud-direct only; other modes (oauth/legacy)
  * are accepted as aliases for forward-compat and currently route through the
  * same path.
  */
 export async function resolveCredentials(opts: ResolveOptions = {}): Promise<WindsurfCredentials> {
   const mode = opts.mode ?? modeFromEnv();
+
+  // Serve the cached snapshot if still warm.
+  const now = Date.now();
+  if (resolveCache.value && now < resolveCache.expiry) {
+    return resolveCache.value;
+  }
 
   // Single active code path: cloud-direct.
   const oauth = loadCredentials();
@@ -84,7 +108,7 @@ export async function resolveCredentials(opts: ResolveOptions = {}): Promise<Win
   // needs to differentiate at runtime.
   void mode;
 
-  return {
+  const creds: WindsurfCredentials = {
     apiKey: oauth.apiKey,
     csrfToken: '',         // unused in cloud-direct
     port: 0,                // unused in cloud-direct
@@ -92,6 +116,8 @@ export async function resolveCredentials(opts: ResolveOptions = {}): Promise<Win
     cloudDirect: true,
     apiServerUrl: oauth.apiServerUrl,
   };
+  resolveCache = { value: creds, expiry: now + RESOLVE_CACHE_TTL_MS };
+  return creds;
 }
 
 /* =============================================================================
