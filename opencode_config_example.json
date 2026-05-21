@@ -319,6 +319,16 @@
           "limit": {
             "context": 128000,
             "output": 4096
+          },
+          "attachment": true,
+          "modalities": {
+            "input": [
+              "text",
+              "image"
+            ],
+            "output": [
+              "text"
+            ]
           }
         },
         "gpt-4o": {
@@ -564,16 +574,6 @@
           "limit": {
             "context": 200000,
             "output": 100000
-          },
-          "attachment": true,
-          "modalities": {
-            "input": [
-              "text",
-              "image"
-            ],
-            "output": [
-              "text"
-            ]
           }
         },
         "o3-pro": {
@@ -978,6 +978,16 @@
           "limit": {
             "context": 200000,
             "output": 8192
+          },
+          "attachment": true,
+          "modalities": {
+            "input": [
+              "text",
+              "image"
+            ],
+            "output": [
+              "text"
+            ]
           }
         },
         "swe-1.5-thinking": {
@@ -985,6 +995,16 @@
           "limit": {
             "context": 200000,
             "output": 8192
+          },
+          "attachment": true,
+          "modalities": {
+            "input": [
+              "text",
+              "image"
+            ],
+            "output": [
+              "text"
+            ]
           }
         },
         "swe-1.5-slow": {
@@ -992,6 +1012,16 @@
           "limit": {
             "context": 200000,
             "output": 8192
+          },
+          "attachment": true,
+          "modalities": {
+            "input": [
+              "text",
+              "image"
+            ],
+            "output": [
+              "text"
+            ]
           }
         },
         "swe-1.6": {
@@ -1280,6 +1310,16 @@
           "limit": {
             "context": 262144,
             "output": 65536
+          },
+          "attachment": true,
+          "modalities": {
+            "input": [
+              "text",
+              "image"
+            ],
+            "output": [
+              "text"
+            ]
           }
         },
         "kimi-k2.6": {

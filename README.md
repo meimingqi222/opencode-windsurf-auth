@@ -13,7 +13,7 @@ Opencode plugin that registers Windsurf/Cognition as a model provider. Sign in w
 - **Cloud-direct streaming, no install required** — talks to `server.codeium.com` over HTTPS; **no local `language_server`, no Windsurf dependency**
 - **OpenAI-compatible `/v1/chat/completions` proxy** — full streaming SSE per spec (delta.role on first chunk, delta.content/reasoning/tool_calls, separate finish + usage chunks, `data: [DONE]`)
 - **MCP tools + full system prompt** — opencode hands every tool, every MCP server, the entire system prompt to the cloud, identical to any other provider
-- **Image attachments (multimodal)** — Claude 3.x/4.x, GPT-4o/4.1/5.x, o3/o4, Gemini 2.x/3.x, Kimi K2.6, and `swe-1.6` accept image content parts via opencode's `-f <path>` attachment flag (and the TUI's paste/drag-drop). Configure with `attachment: true` + `modalities: { input: ["text", "image"], output: ["text"] }` per model — see [`opencode_config_example.json`](opencode_config_example.json) for the canonical list. Text-only models (DeepSeek, GLM, MiniMax, older Kimi/Llama/Qwen, etc.) deliberately omit the flag so opencode blocks image attachment in the UI.
+- **Multimodal** — text + image content parts
 - **Tenant-aware** — honors `apiServerUrl` from RegisterUser (self-serve, EU, FedRAMP, enterprise portals)
 
 ## Overview
@@ -79,7 +79,7 @@ The plugin starts a local proxy on `127.0.0.1:42100` (random free port on fallba
   "plugin": ["opencode-windsurf-auth@beta"],
   "provider": {
     "windsurf": {
-      "name": "Cognition",
+      "name": "Cognition (Windsurf)",
       "npm": "@ai-sdk/openai-compatible",
       "options": {
         "baseURL": "http://127.0.0.1:42100/v1"
@@ -88,6 +88,8 @@ The plugin starts a local proxy on `127.0.0.1:42100` (random free port on fallba
         "claude-opus-4.7": {
           "name": "Claude Opus 4.7",
           "limit": { "context": 1000000, "output": 128000 },
+          "attachment": true,
+          "modalities": { "input": ["text", "image"], "output": ["text"] },
           "variants": {
             "low": {}, "medium": {}, "high": {}, "xhigh": {}, "max": {},
             "low-fast": {}, "medium-fast": {}, "high-fast": {}, "xhigh-fast": {}, "max-fast": {}
@@ -96,6 +98,8 @@ The plugin starts a local proxy on `127.0.0.1:42100` (random free port on fallba
         "gpt-5.5": {
           "name": "GPT 5.5",
           "limit": { "context": 1050000, "output": 128000 },
+          "attachment": true,
+          "modalities": { "input": ["text", "image"], "output": ["text"] },
           "variants": {
             "none": {}, "low": {}, "medium": {}, "high": {}, "xhigh": {},
             "none-priority": {}, "low-priority": {}, "medium-priority": {}, "high-priority": {}, "xhigh-priority": {}
@@ -107,16 +111,22 @@ The plugin starts a local proxy on `127.0.0.1:42100` (random free port on fallba
         },
         "kimi-k2.6": {
           "name": "Kimi K2.6",
-          "limit": { "context": 262144, "output": 262144 }
+          "limit": { "context": 262144, "output": 262144 },
+          "attachment": true,
+          "modalities": { "input": ["text", "image"], "output": ["text"] }
         },
         "gemini-3.5-flash": {
           "name": "Gemini 3.5 Flash",
           "limit": { "context": 1048576, "output": 65536 },
+          "attachment": true,
+          "modalities": { "input": ["text", "image"], "output": ["text"] },
           "variants": { "minimal": {}, "low": {}, "medium": {}, "high": {} }
         },
         "claude-opus-4.6": {
           "name": "Claude Opus 4.6",
           "limit": { "context": 1000000, "output": 128000 },
+          "attachment": true,
+          "modalities": { "input": ["text", "image"], "output": ["text"] },
           "variants": {
             "thinking": {}, "1m": {}, "thinking-1m": {}, "fast": {}, "thinking-fast": {}
           }
@@ -133,28 +143,7 @@ After saving the config:
 opencode models windsurf                                       # confirm models appear under windsurf/
 opencode run --model=windsurf/swe-1.6 "hi"                     # free-tier smoke test
 opencode run --model=windsurf/claude-opus-4.7:high "hi"        # paid models
-opencode run --model=windsurf/kimi-k2.6 -f ./screenshot.png -- "describe this image"   # image attachment
 ```
-
-### Image attachments per model
-
-opencode only allows image attachments to models whose config declares
-`attachment: true`. The ready-to-paste example sets this for the families
-known to support vision on the Cognition cloud:
-
-```json
-"kimi-k2.6": {
-  "name": "Kimi K2.6",
-  "limit": { "context": 262144, "output": 262144 },
-  "attachment": true,
-  "modalities": { "input": ["text", "image"], "output": ["text"] }
-}
-```
-
-Verified end-to-end via opencode CLI on `kimi-k2.6`. Other model families
-(Claude 3.x/4.x, GPT-4o/4.1/5.x, o3/o4, Gemini 2.x/3.x, `swe-1.6`) ship
-the same flags in the example config based on each family's published
-vision capability. To opt a custom model out, just omit both fields.
 
 ## Project Layout
 
