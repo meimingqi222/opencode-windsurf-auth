@@ -16,6 +16,16 @@
           "limit": {
             "context": 200000,
             "output": 4096
+          },
+          "attachment": true,
+          "modalities": {
+            "input": [
+              "text",
+              "image"
+            ],
+            "output": [
+              "text"
+            ]
           }
         },
         "claude-3-sonnet": {
@@ -23,6 +33,16 @@
           "limit": {
             "context": 200000,
             "output": 4096
+          },
+          "attachment": true,
+          "modalities": {
+            "input": [
+              "text",
+              "image"
+            ],
+            "output": [
+              "text"
+            ]
           }
         },
         "claude-3-haiku": {
@@ -30,6 +50,16 @@
           "limit": {
             "context": 200000,
             "output": 4096
+          },
+          "attachment": true,
+          "modalities": {
+            "input": [
+              "text",
+              "image"
+            ],
+            "output": [
+              "text"
+            ]
           }
         },
         "claude-3.5-sonnet": {
@@ -37,6 +67,16 @@
           "limit": {
             "context": 200000,
             "output": 8192
+          },
+          "attachment": true,
+          "modalities": {
+            "input": [
+              "text",
+              "image"
+            ],
+            "output": [
+              "text"
+            ]
           }
         },
         "claude-3.5-haiku": {
@@ -44,6 +84,16 @@
           "limit": {
             "context": 200000,
             "output": 8192
+          },
+          "attachment": true,
+          "modalities": {
+            "input": [
+              "text",
+              "image"
+            ],
+            "output": [
+              "text"
+            ]
           }
         },
         "claude-3.7-sonnet": {
@@ -51,6 +101,16 @@
           "limit": {
             "context": 200000,
             "output": 64000
+          },
+          "attachment": true,
+          "modalities": {
+            "input": [
+              "text",
+              "image"
+            ],
+            "output": [
+              "text"
+            ]
           }
         },
         "claude-3.7-sonnet-thinking": {
@@ -58,6 +118,16 @@
           "limit": {
             "context": 200000,
             "output": 64000
+          },
+          "attachment": true,
+          "modalities": {
+            "input": [
+              "text",
+              "image"
+            ],
+            "output": [
+              "text"
+            ]
           }
         },
         "claude-4-opus": {
@@ -65,6 +135,16 @@
           "limit": {
             "context": 200000,
             "output": 32000
+          },
+          "attachment": true,
+          "modalities": {
+            "input": [
+              "text",
+              "image"
+            ],
+            "output": [
+              "text"
+            ]
           }
         },
         "claude-4-opus-thinking": {
@@ -72,6 +152,16 @@
           "limit": {
             "context": 200000,
             "output": 32000
+          },
+          "attachment": true,
+          "modalities": {
+            "input": [
+              "text",
+              "image"
+            ],
+            "output": [
+              "text"
+            ]
           }
         },
         "claude-4-sonnet": {
@@ -79,6 +169,16 @@
           "limit": {
             "context": 200000,
             "output": 64000
+          },
+          "attachment": true,
+          "modalities": {
+            "input": [
+              "text",
+              "image"
+            ],
+            "output": [
+              "text"
+            ]
           }
         },
         "claude-4-sonnet-thinking": {
@@ -86,6 +186,16 @@
           "limit": {
             "context": 200000,
             "output": 64000
+          },
+          "attachment": true,
+          "modalities": {
+            "input": [
+              "text",
+              "image"
+            ],
+            "output": [
+              "text"
+            ]
           }
         },
         "claude-4.1-opus": {
@@ -93,6 +203,16 @@
           "limit": {
             "context": 200000,
             "output": 32000
+          },
+          "attachment": true,
+          "modalities": {
+            "input": [
+              "text",
+              "image"
+            ],
+            "output": [
+              "text"
+            ]
           }
         },
         "claude-4.1-opus-thinking": {
@@ -100,6 +220,16 @@
           "limit": {
             "context": 200000,
             "output": 32000
+          },
+          "attachment": true,
+          "modalities": {
+            "input": [
+              "text",
+              "image"
+            ],
+            "output": [
+              "text"
+            ]
           }
         },
         "claude-4.5-sonnet": {
@@ -107,6 +237,16 @@
           "limit": {
             "context": 200000,
             "output": 64000
+          },
+          "attachment": true,
+          "modalities": {
+            "input": [
+              "text",
+              "image"
+            ],
+            "output": [
+              "text"
+            ]
           }
         },
         "claude-4.5-sonnet-thinking": {
@@ -114,6 +254,16 @@
           "limit": {
             "context": 200000,
             "output": 64000
+          },
+          "attachment": true,
+          "modalities": {
+            "input": [
+              "text",
+              "image"
+            ],
+            "output": [
+              "text"
+            ]
           }
         },
         "claude-4.5-opus": {
@@ -121,6 +271,16 @@
           "limit": {
             "context": 200000,
             "output": 64000
+          },
+          "attachment": true,
+          "modalities": {
+            "input": [
+              "text",
+              "image"
+            ],
+            "output": [
+              "text"
+            ]
           }
         },
         "claude-4.5-opus-thinking": {
@@ -128,6 +288,16 @@
           "limit": {
             "context": 200000,
             "output": 64000
+          },
+          "attachment": true,
+          "modalities": {
+            "input": [
+              "text",
+              "image"
+            ],
+            "output": [
+              "text"
+            ]
           }
         },
         "claude-code": {
@@ -156,6 +326,16 @@
           "limit": {
             "context": 128000,
             "output": 16384
+          },
+          "attachment": true,
+          "modalities": {
+            "input": [
+              "text",
+              "image"
+            ],
+            "output": [
+              "text"
+            ]
           }
         },
         "gpt-4o-mini": {
@@ -163,6 +343,16 @@
           "limit": {
             "context": 128000,
             "output": 16384
+          },
+          "attachment": true,
+          "modalities": {
+            "input": [
+              "text",
+              "image"
+            ],
+            "output": [
+              "text"
+            ]
           }
         },
         "gpt-4.1": {
@@ -170,6 +360,16 @@
           "limit": {
             "context": 1047576,
             "output": 32768
+          },
+          "attachment": true,
+          "modalities": {
+            "input": [
+              "text",
+              "image"
+            ],
+            "output": [
+              "text"
+            ]
           }
         },
         "gpt-4.1-mini": {
@@ -177,6 +377,16 @@
           "limit": {
             "context": 1047576,
             "output": 32768
+          },
+          "attachment": true,
+          "modalities": {
+            "input": [
+              "text",
+              "image"
+            ],
+            "output": [
+              "text"
+            ]
           }
         },
         "gpt-4.1-nano": {
@@ -184,6 +394,16 @@
           "limit": {
             "context": 1047576,
             "output": 32768
+          },
+          "attachment": true,
+          "modalities": {
+            "input": [
+              "text",
+              "image"
+            ],
+            "output": [
+              "text"
+            ]
           }
         },
         "gpt-5": {
@@ -196,6 +416,16 @@
             "low": {},
             "high": {},
             "nano": {}
+          },
+          "attachment": true,
+          "modalities": {
+            "input": [
+              "text",
+              "image"
+            ],
+            "output": [
+              "text"
+            ]
           }
         },
         "gpt-5-codex": {
@@ -203,6 +433,16 @@
           "limit": {
             "context": 400000,
             "output": 128000
+          },
+          "attachment": true,
+          "modalities": {
+            "input": [
+              "text",
+              "image"
+            ],
+            "output": [
+              "text"
+            ]
           }
         },
         "gpt-5.1-codex-mini": {
@@ -215,6 +455,16 @@
             "low": {},
             "medium": {},
             "high": {}
+          },
+          "attachment": true,
+          "modalities": {
+            "input": [
+              "text",
+              "image"
+            ],
+            "output": [
+              "text"
+            ]
           }
         },
         "gpt-5.1-codex": {
@@ -227,6 +477,16 @@
             "low": {},
             "medium": {},
             "high": {}
+          },
+          "attachment": true,
+          "modalities": {
+            "input": [
+              "text",
+              "image"
+            ],
+            "output": [
+              "text"
+            ]
           }
         },
         "gpt-5.1-codex-max": {
@@ -239,6 +499,16 @@
             "low": {},
             "medium": {},
             "high": {}
+          },
+          "attachment": true,
+          "modalities": {
+            "input": [
+              "text",
+              "image"
+            ],
+            "output": [
+              "text"
+            ]
           }
         },
         "gpt-5.2": {
@@ -256,6 +526,16 @@
             "low-priority": {},
             "high-priority": {},
             "xhigh-priority": {}
+          },
+          "attachment": true,
+          "modalities": {
+            "input": [
+              "text",
+              "image"
+            ],
+            "output": [
+              "text"
+            ]
           }
         },
         "o3": {
@@ -267,6 +547,16 @@
           "variants": {
             "low": {},
             "high": {}
+          },
+          "attachment": true,
+          "modalities": {
+            "input": [
+              "text",
+              "image"
+            ],
+            "output": [
+              "text"
+            ]
           }
         },
         "o3-mini": {
@@ -274,6 +564,16 @@
           "limit": {
             "context": 200000,
             "output": 100000
+          },
+          "attachment": true,
+          "modalities": {
+            "input": [
+              "text",
+              "image"
+            ],
+            "output": [
+              "text"
+            ]
           }
         },
         "o3-pro": {
@@ -285,6 +585,16 @@
           "variants": {
             "low": {},
             "high": {}
+          },
+          "attachment": true,
+          "modalities": {
+            "input": [
+              "text",
+              "image"
+            ],
+            "output": [
+              "text"
+            ]
           }
         },
         "o4-mini": {
@@ -296,6 +606,16 @@
           "variants": {
             "low": {},
             "high": {}
+          },
+          "attachment": true,
+          "modalities": {
+            "input": [
+              "text",
+              "image"
+            ],
+            "output": [
+              "text"
+            ]
           }
         },
         "gemini-2.0-flash": {
@@ -303,6 +623,16 @@
           "limit": {
             "context": 1048576,
             "output": 8192
+          },
+          "attachment": true,
+          "modalities": {
+            "input": [
+              "text",
+              "image"
+            ],
+            "output": [
+              "text"
+            ]
           }
         },
         "gemini-2.5-pro": {
@@ -310,6 +640,16 @@
           "limit": {
             "context": 1048576,
             "output": 65536
+          },
+          "attachment": true,
+          "modalities": {
+            "input": [
+              "text",
+              "image"
+            ],
+            "output": [
+              "text"
+            ]
           }
         },
         "gemini-2.5-flash": {
@@ -317,6 +657,16 @@
           "limit": {
             "context": 1048576,
             "output": 65536
+          },
+          "attachment": true,
+          "modalities": {
+            "input": [
+              "text",
+              "image"
+            ],
+            "output": [
+              "text"
+            ]
           }
         },
         "gemini-2.5-flash-thinking": {
@@ -324,6 +674,16 @@
           "limit": {
             "context": 1048576,
             "output": 65536
+          },
+          "attachment": true,
+          "modalities": {
+            "input": [
+              "text",
+              "image"
+            ],
+            "output": [
+              "text"
+            ]
           }
         },
         "gemini-2.5-flash-lite": {
@@ -331,6 +691,16 @@
           "limit": {
             "context": 1048576,
             "output": 65536
+          },
+          "attachment": true,
+          "modalities": {
+            "input": [
+              "text",
+              "image"
+            ],
+            "output": [
+              "text"
+            ]
           }
         },
         "gemini-3.0-pro": {
@@ -344,6 +714,16 @@
             "low": {},
             "medium": {},
             "high": {}
+          },
+          "attachment": true,
+          "modalities": {
+            "input": [
+              "text",
+              "image"
+            ],
+            "output": [
+              "text"
+            ]
           }
         },
         "gemini-3.0-flash": {
@@ -357,6 +737,16 @@
             "low": {},
             "medium": {},
             "high": {}
+          },
+          "attachment": true,
+          "modalities": {
+            "input": [
+              "text",
+              "image"
+            ],
+            "output": [
+              "text"
+            ]
           }
         },
         "deepseek-v3": {
@@ -612,6 +1002,16 @@
           },
           "variants": {
             "fast": {}
+          },
+          "attachment": true,
+          "modalities": {
+            "input": [
+              "text",
+              "image"
+            ],
+            "output": [
+              "text"
+            ]
           }
         },
         "gpt-oss-120b": {
@@ -636,6 +1036,16 @@
             "medium-priority": {},
             "high-priority": {},
             "xhigh-priority": {}
+          },
+          "attachment": true,
+          "modalities": {
+            "input": [
+              "text",
+              "image"
+            ],
+            "output": [
+              "text"
+            ]
           }
         },
         "claude-opus-4.7": {
@@ -655,6 +1065,16 @@
             "high-fast": {},
             "xhigh-fast": {},
             "max-fast": {}
+          },
+          "attachment": true,
+          "modalities": {
+            "input": [
+              "text",
+              "image"
+            ],
+            "output": [
+              "text"
+            ]
           }
         },
         "claude-opus-4.6": {
@@ -669,6 +1089,16 @@
             "thinking-1m": {},
             "fast": {},
             "thinking-fast": {}
+          },
+          "attachment": true,
+          "modalities": {
+            "input": [
+              "text",
+              "image"
+            ],
+            "output": [
+              "text"
+            ]
           }
         },
         "claude-sonnet-4.6": {
@@ -681,6 +1111,16 @@
             "thinking": {},
             "1m": {},
             "thinking-1m": {}
+          },
+          "attachment": true,
+          "modalities": {
+            "input": [
+              "text",
+              "image"
+            ],
+            "output": [
+              "text"
+            ]
           }
         },
         "gemini-3.5-flash": {
@@ -694,6 +1134,16 @@
             "low": {},
             "medium": {},
             "high": {}
+          },
+          "attachment": true,
+          "modalities": {
+            "input": [
+              "text",
+              "image"
+            ],
+            "output": [
+              "text"
+            ]
           }
         },
         "gemini-3.1-pro": {
@@ -705,6 +1155,16 @@
           "variants": {
             "low": {},
             "high": {}
+          },
+          "attachment": true,
+          "modalities": {
+            "input": [
+              "text",
+              "image"
+            ],
+            "output": [
+              "text"
+            ]
           }
         },
         "gpt-5.4": {
@@ -724,6 +1184,16 @@
             "medium-priority": {},
             "high-priority": {},
             "xhigh-priority": {}
+          },
+          "attachment": true,
+          "modalities": {
+            "input": [
+              "text",
+              "image"
+            ],
+            "output": [
+              "text"
+            ]
           }
         },
         "gpt-5.4-mini": {
@@ -737,6 +1207,16 @@
             "medium": {},
             "high": {},
             "xhigh": {}
+          },
+          "attachment": true,
+          "modalities": {
+            "input": [
+              "text",
+              "image"
+            ],
+            "output": [
+              "text"
+            ]
           }
         },
         "gpt-5.5": {
@@ -756,6 +1236,16 @@
             "medium-priority": {},
             "high-priority": {},
             "xhigh-priority": {}
+          },
+          "attachment": true,
+          "modalities": {
+            "input": [
+              "text",
+              "image"
+            ],
+            "output": [
+              "text"
+            ]
           }
         },
         "gpt-5.3-codex": {
@@ -773,6 +1263,16 @@
             "medium-priority": {},
             "high-priority": {},
             "xhigh-priority": {}
+          },
+          "attachment": true,
+          "modalities": {
+            "input": [
+              "text",
+              "image"
+            ],
+            "output": [
+              "text"
+            ]
           }
         },
         "kimi-k2.5": {
@@ -787,6 +1287,16 @@
           "limit": {
             "context": 262144,
             "output": 262144
+          },
+          "attachment": true,
+          "modalities": {
+            "input": [
+              "text",
+              "image"
+            ],
+            "output": [
+              "text"
+            ]
           }
         },
         "deepseek-v4": {

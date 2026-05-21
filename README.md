@@ -13,7 +13,7 @@ Opencode plugin that registers Windsurf/Cognition as a model provider. Sign in w
 - **Cloud-direct streaming, no install required** — talks to `server.codeium.com` over HTTPS; **no local `language_server`, no Windsurf dependency**
 - **OpenAI-compatible `/v1/chat/completions` proxy** — full streaming SSE per spec (delta.role on first chunk, delta.content/reasoning/tool_calls, separate finish + usage chunks, `data: [DONE]`)
 - **MCP tools + full system prompt** — opencode hands every tool, every MCP server, the entire system prompt to the cloud, identical to any other provider
-- **Multimodal** — text + image content parts
+- **Image attachments (multimodal)** — Claude 3.x/4.x, GPT-4o/4.1/5.x, o3/o4, Gemini 2.x/3.x, Kimi K2.6, and `swe-1.6` accept image content parts via opencode's `-f <path>` attachment flag (and the TUI's paste/drag-drop). Configure with `attachment: true` + `modalities: { input: ["text", "image"], output: ["text"] }` per model — see [`opencode_config_example.json`](opencode_config_example.json) for the canonical list. Text-only models (DeepSeek, GLM, MiniMax, older Kimi/Llama/Qwen, etc.) deliberately omit the flag so opencode blocks image attachment in the UI.
 - **Tenant-aware** — honors `apiServerUrl` from RegisterUser (self-serve, EU, FedRAMP, enterprise portals)
 
 ## Overview
@@ -133,7 +133,28 @@ After saving the config:
 opencode models windsurf                                       # confirm models appear under windsurf/
 opencode run --model=windsurf/swe-1.6 "hi"                     # free-tier smoke test
 opencode run --model=windsurf/claude-opus-4.7:high "hi"        # paid models
+opencode run --model=windsurf/kimi-k2.6 -f ./screenshot.png -- "describe this image"   # image attachment
 ```
+
+### Image attachments per model
+
+opencode only allows image attachments to models whose config declares
+`attachment: true`. The ready-to-paste example sets this for the families
+known to support vision on the Cognition cloud:
+
+```json
+"kimi-k2.6": {
+  "name": "Kimi K2.6",
+  "limit": { "context": 262144, "output": 262144 },
+  "attachment": true,
+  "modalities": { "input": ["text", "image"], "output": ["text"] }
+}
+```
+
+Verified end-to-end via opencode CLI on `kimi-k2.6`. Other model families
+(Claude 3.x/4.x, GPT-4o/4.1/5.x, o3/o4, Gemini 2.x/3.x, `swe-1.6`) ship
+the same flags in the example config based on each family's published
+vision capability. To opt a custom model out, just omit both fields.
 
 ## Project Layout
 
