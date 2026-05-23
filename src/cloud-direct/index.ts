@@ -31,3 +31,10 @@ export {
   clearCachedUserJwt,
   CloudAuthError,
 } from './auth.js';
+
+export {
+  getCachedCatalog,
+  clearCachedCatalog,
+  ModelNotAvailableError,
+  type ModelCatalogEntry,
+} from './catalog.js';

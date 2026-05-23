@@ -33,6 +33,7 @@ import {
 } from './wire.js';
 import { buildMetadata } from './metadata.js';
 import { getCachedUserJwt } from './auth.js';
+import { getCachedCatalog, ModelNotAvailableError } from './catalog.js';
 
 /**
  * Connect-RPC streaming inactivity timeout. If the cloud sends zero bytes
@@ -781,6 +782,28 @@ const TRACE_ID_RE = /\(trace ID: ([0-9a-f]+)\)/i;
 export async function* streamChatEvents(req: CloudChatRequest): AsyncGenerator<CloudChatEvent> {
   const host = (req.apiServerUrl ?? 'https://server.codeium.com').replace(/\/$/, '');
   const userJwt = await getCachedUserJwt(req.apiKey, host, req.signal);
+
+  // Pre-flight: consult the per-account model catalog. Cognition's cloud
+  // returns an opaque `permission_denied: "an internal error occurred (trace
+  // ID: ...)"` for every chat call that targets a model not enabled on the
+  // caller's tier — issue #14. The catalog's `disabled` flag is the
+  // authoritative source for "can this account run this UID"; we surface a
+  // named error here so the user knows why instead of guessing.
+  //
+  // Best-effort: if the catalog fetch fails (network, auth, schema drift) we
+  // pass through to the chat call. The cloud will still surface its own
+  // error and the trailer-error path below enriches the message in-place.
+  const catalog = await getCachedCatalog(req.apiKey, host, req.signal).catch(() => null);
+  if (catalog) {
+    const entry = catalog.byUid.get(req.modelUid);
+    if (!entry) {
+      throw new ModelNotAvailableError(req.modelUid, req.modelUid, 'not_listed');
+    }
+    if (entry.disabled) {
+      throw new ModelNotAvailableError(req.modelUid, entry.label, 'disabled');
+    }
+  }
+
   // Reuse session + cascade ids across calls for the same (apiKey, host).
   // Without this, every turn looks like a brand-new server-side session
   // and the cloud's prompt cache never hits — significant cost regression
@@ -1015,6 +1038,27 @@ export async function* streamChatEvents(req: CloudChatRequest): AsyncGenerator<C
   }
 
   if (trailerError) {
+    // Cognition uses `permission_denied: "an internal error occurred (trace
+    // ID: …)"` as a catch-all for "your account can't run this model" — same
+    // root cause issue #14 reported. The pre-flight above catches this when
+    // the catalog disagrees with the call, but the catalog can lag (a model
+    // that was enabled at fetch time may have been gated between then and
+    // now) or be missing (network failure caused a fall-through). When the
+    // raw trailer is this exact shape, swap in a message that names the
+    // model and explains the likely cause rather than re-passing
+    // Cognition's opaque text. The cloud's original message is appended in
+    // parens so users (and bug reports) still have it verbatim.
+    const isOpaquePermissionDenial =
+      trailerError.code === 'permission_denied' &&
+      /an internal error occurred/i.test(trailerError.message);
+    if (isOpaquePermissionDenial) {
+      const enriched =
+        `Cognition denied this request for model "${req.modelUid}" with the opaque ` +
+        `"an internal error occurred" message. This almost always means the model ` +
+        `is not enabled for your account/tier — see https://codeium.com/account. ` +
+        `(cloud trace ID: ${trailerError.traceId ?? 'n/a'}; raw message: ${trailerError.message})`;
+      throw new CloudChatError(enriched, trailerError.code, trailerError.traceId);
+    }
     throw new CloudChatError(trailerError.message, trailerError.code, trailerError.traceId);
   }
   // Truncation detection: the cloud always terminates a successful stream

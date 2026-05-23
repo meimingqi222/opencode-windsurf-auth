@@ -1281,6 +1281,8 @@ export const createWindsurfPlugin =
                 clearCachedUserJwt();
                 const { clearSessionIds } = await import('./cloud-direct/chat.js');
                 clearSessionIds();
+                const { clearCachedCatalog } = await import('./cloud-direct/catalog.js');
+                clearCachedCatalog();
                 const { clearResolveCache } = await import('./plugin/credentials-resolver.js');
                 clearResolveCache();
               } catch { /* best-effort */ }
